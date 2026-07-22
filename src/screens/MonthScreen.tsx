@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { ChevronLeft, ChevronRight, Layers, LayoutGrid, Rows3 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ImageDown, Layers, LayoutGrid, Rows3 } from 'lucide-react';
 import type { Note } from '../storage/types';
 import { useJournalStore } from '../store/useJournalStore';
 import { listMonth } from '../lib/queries';
+import { downloadMonthKeepsake } from '../lib/keepsake';
 import { MONTH_NAMES, daysInMonth, todayISO } from '../lib/date';
 import { navigate } from '../router/route';
 import { BackBar } from '../components/BackBar';
@@ -58,15 +59,27 @@ export function MonthScreen({ year, month }: { year: number; month: number }) {
             <ChevronRight size={18} />
           </button>
         </div>
-        <button
-          onClick={() => setSpread((v) => !v)}
-          aria-label={spread ? 'Stack view' : 'Spread view'}
-          title={spread ? 'Stack view' : 'Spread view'}
-          className="flex items-center gap-1.5 rounded-full border border-rule px-2.5 py-1 font-mono text-xs text-ink-soft hover:border-accent/50"
-        >
-          {spread ? <Layers size={15} /> : <Rows3 size={15} />}
-          {spread ? 'Stack' : 'Spread'}
-        </button>
+        <div className="flex items-center gap-1.5">
+          {notes.length > 0 && (
+            <button
+              onClick={() => downloadMonthKeepsake(year, month, notes)}
+              aria-label="Save this month as an image"
+              title="Save as image"
+              className="rounded-full border border-rule p-1.5 text-ink-soft hover:border-accent/50"
+            >
+              <ImageDown size={15} />
+            </button>
+          )}
+          <button
+            onClick={() => setSpread((v) => !v)}
+            aria-label={spread ? 'Stack view' : 'Spread view'}
+            title={spread ? 'Stack view' : 'Spread view'}
+            className="flex items-center gap-1.5 rounded-full border border-rule px-2.5 py-1 font-mono text-xs text-ink-soft hover:border-accent/50"
+          >
+            {spread ? <Layers size={15} /> : <Rows3 size={15} />}
+            {spread ? 'Stack' : 'Spread'}
+          </button>
+        </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-3">

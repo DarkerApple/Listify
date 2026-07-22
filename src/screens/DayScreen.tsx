@@ -15,6 +15,7 @@ import { SealStamp } from '../components/SealStamp';
 import { MoodStar } from '../components/MoodStar';
 import { TagEditor } from '../components/TagEditor';
 import { VaultDialog } from '../components/VaultDialog';
+import { Banners } from '../components/Banners';
 
 function gapFor(prevTs: number | null, ts: number): number {
   if (prevTs === null) return 4;
@@ -163,6 +164,7 @@ export function DayScreen({ date }: { date: ISODate }) {
 
           {/* Entries / locked panel */}
           <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+            {today && !privateLocked && <Banners />}
             {privateLocked ? (
               <div className="mt-16 flex flex-col items-center gap-4 text-center">
                 <div className="grid h-14 w-14 place-items-center rounded-full bg-accent/10 text-accent">

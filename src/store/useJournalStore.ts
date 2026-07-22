@@ -188,10 +188,12 @@ export const useJournalStore = create<JournalState>((set, get) => {
     },
 
     async seal(date = get().date) {
+      const before = get().note?.sealed;
       await mutate(date, (note) => {
         if (note.sealed || note.entries.length === 0) return null;
         return { ...note, sealed: true, sealedAt: Date.now(), updatedAt: Date.now() };
       });
+      if (!before && get().note?.sealed) useSettings.getState().noteSealed();
     },
 
     async sweepAutoSeal() {
@@ -200,6 +202,7 @@ export const useJournalStore = create<JournalState>((set, get) => {
       const stale = bundle.notes.filter((n) => n.date < today && !n.sealed && n.entries.length > 0);
       for (const n of stale) {
         await storage.upsertNote({ ...n, sealed: true, sealedAt: sealBoundary(n.date) });
+        useSettings.getState().noteSealed();
       }
       if (stale.length) {
         set((s) => ({ revision: s.revision + 1 }));
