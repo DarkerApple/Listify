@@ -38,7 +38,7 @@ export function EntryRow({
       {/* Timestamp gutter */}
       <time
         className={[
-          'w-16 shrink-0 select-none pt-[0.2em] text-right font-mono text-[0.7rem] tabular-nums transition-colors',
+          'w-[3.4rem] shrink-0 select-none pt-[0.28em] text-right font-mono text-[0.68rem] tabular-nums transition-colors',
           active ? 'text-ink-soft' : 'text-ink-faint',
         ].join(' ')}
         dateTime={new Date(entry.createdAt).toISOString()}
@@ -51,7 +51,7 @@ export function EntryRow({
         {entry.type === 'todo' && (
           <TodoIcon state={entry.todoState} onCycle={onCycle} disabled={!editable} />
         )}
-        <p className="min-w-0 flex-1 font-serif text-[1.02rem] leading-relaxed">
+        <p className="min-w-0 flex-1 font-serif text-[1.08rem] leading-[1.72] text-ink/95">
           <EntryText text={entry.text} muted={done} interactiveTags />
         </p>
 

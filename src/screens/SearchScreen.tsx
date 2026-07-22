@@ -31,7 +31,7 @@ export function SearchScreen() {
 
   return (
     <div className="mx-auto flex h-full w-full max-w-2xl flex-col">
-      <BackBar title="Search" />
+      <BackBar title="Search" root />
 
       <div className="px-4 pb-2">
         <div className="flex items-center gap-2 rounded-2xl border border-rule bg-paper px-3 py-2 focus-within:border-accent/50">

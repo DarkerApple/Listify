@@ -5,12 +5,11 @@ import { ChevronLeft, ChevronRight, Lock, LockOpen, Stamp } from 'lucide-react';
 import type { Entry, ISODate } from '../storage/types';
 import { useJournalStore } from '../store/useJournalStore';
 import { useSecurity } from '../store/useSecurity';
-import { addDaysISO, formatClock, formatLongDate, isToday, todayISO } from '../lib/date';
+import { MONTH_NAMES, addDaysISO, formatClock, formatLongDate, isToday, todayISO } from '../lib/date';
 import { navigate } from '../router/route';
 import { thunk } from '../lib/haptics';
 import { EntryRow } from '../components/EntryRow';
 import { Composer } from '../components/Composer';
-import { Toolbar } from '../components/Toolbar';
 import { SealStamp } from '../components/SealStamp';
 import { MoodStar } from '../components/MoodStar';
 import { TagEditor } from '../components/TagEditor';
@@ -137,28 +136,34 @@ export function DayScreen({ date }: { date: ISODate }) {
       <div {...bind()} style={{ touchAction: 'pan-y' }} className="h-full">
         <motion.div style={{ x }} className="paper-grid mx-auto flex h-full w-full max-w-2xl flex-col">
           {/* Header */}
-          <header className="shrink-0 px-4 pb-2 pt-[max(1rem,env(safe-area-inset-top))]">
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex items-center gap-1">
-                <button onClick={() => goToDate(addDaysISO(date, -1))} aria-label="Previous day" className="rounded-full p-1.5 text-ink-faint transition-colors hover:text-accent hover:bg-rule/30">
-                  <ChevronLeft size={20} />
-                </button>
-                <div className="px-1">
-                  <h1 className="font-hand text-2xl leading-tight text-ink">{formatLongDate(date)}</h1>
-                  <p className="mt-0.5 flex items-center gap-1 font-mono text-xs uppercase tracking-wide text-ink-faint">
-                    {isPrivate && <Lock size={11} className="text-accent" />}
-                    {today ? 'Today' : sealed ? 'Sealed' : 'A past day'}
-                  </p>
-                </div>
-                <button onClick={() => canNext && goToDate(addDaysISO(date, 1))} disabled={!canNext} aria-label="Next day" className="rounded-full p-1.5 text-ink-faint transition-colors hover:text-accent hover:bg-rule/30 disabled:opacity-30 disabled:hover:text-ink-faint">
-                  <ChevronRight size={20} />
+          <header className="shrink-0 px-3 pb-2 pt-[max(0.9rem,env(safe-area-inset-top))]">
+            <div className="flex items-center justify-between gap-1">
+              <button onClick={() => goToDate(addDaysISO(date, -1))} aria-label="Previous day" className="rounded-full p-2 text-ink-faint transition-colors hover:text-accent hover:bg-rule/30">
+                <ChevronLeft size={22} />
+              </button>
+              <div className="min-w-0 flex-1 text-center">
+                <h1 className="truncate font-hand text-[1.6rem] leading-tight text-ink">{formatLongDate(date)}</h1>
+                <button
+                  onClick={() => navigate({ name: 'month', year: parseInt(date), month: parseInt(date.slice(5, 7)) - 1 })}
+                  className="mt-0.5 inline-flex items-center gap-1 font-mono text-[0.72rem] uppercase tracking-wide text-ink-faint transition-colors hover:text-accent"
+                >
+                  {isPrivate && <Lock size={11} className="text-accent" />}
+                  {today ? 'Today' : sealed ? 'Sealed' : 'Past day'} · {MONTH_NAMES[parseInt(date.slice(5, 7)) - 1]}'s stack
                 </button>
               </div>
-              <Toolbar date={date} />
+              <button onClick={() => canNext && goToDate(addDaysISO(date, 1))} disabled={!canNext} aria-label="Next day" className="rounded-full p-2 text-ink-faint transition-colors hover:text-accent hover:bg-rule/30 disabled:opacity-25 disabled:hover:text-ink-faint">
+                <ChevronRight size={22} />
+              </button>
             </div>
-            {note && !privateLocked && <MoodStar note={note} />}
+            {note && !privateLocked && (
+              <div className="mt-2 flex justify-center">
+                <MoodStar note={note} />
+              </div>
+            )}
             {note && !privateLocked && (note.entries.length > 0 || note.tags.length > 0) && (
-              <TagEditor note={note} />
+              <div className="flex justify-center">
+                <TagEditor note={note} />
+              </div>
             )}
           </header>
 
@@ -197,7 +202,7 @@ export function DayScreen({ date }: { date: ISODate }) {
           </div>
 
           {/* Composer / seal footer */}
-          <div className="shrink-0 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2">
+          <div className="shrink-0 px-4 pb-2 pt-2">
             {editable ? (
               <>
                 <div className="mb-2 flex justify-between">

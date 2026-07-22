@@ -40,7 +40,7 @@ export function MonthScreen({ year, month }: { year: number; month: number }) {
 
   return (
     <div className="mx-auto flex h-full w-full max-w-2xl flex-col">
-      <BackBar title={`${MONTH_NAMES[month]}`} subtitle={`${year} · notestacks`} />
+      <BackBar title={`${MONTH_NAMES[month]}`} subtitle={`${year} · notestacks`} root />
 
       {/* Month nav + view toggle */}
       <div className="flex items-center justify-between px-4 pb-1">

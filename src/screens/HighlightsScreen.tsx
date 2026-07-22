@@ -23,7 +23,7 @@ export function HighlightsScreen() {
 
   return (
     <div className="mx-auto flex h-full w-full max-w-2xl flex-col">
-      <BackBar title="Highlights" subtitle="monumental days" />
+      <BackBar title="Highlights" subtitle="monumental days" root />
 
       {notes.length === 0 ? (
         <div className="grid flex-1 place-items-center px-8">

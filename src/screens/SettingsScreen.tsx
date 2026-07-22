@@ -209,7 +209,7 @@ export function SettingsScreen() {
 
   return (
     <div className="mx-auto flex h-full w-full max-w-2xl flex-col">
-      <BackBar title="Settings" />
+      <BackBar title="Settings" root />
       <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-5 py-4">
         <section className="space-y-2">
           <h2 className="flex items-center gap-1.5 font-mono text-xs uppercase tracking-wide text-ink-faint">

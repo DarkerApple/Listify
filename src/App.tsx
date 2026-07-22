@@ -11,6 +11,7 @@ import { HighlightsScreen } from './screens/HighlightsScreen';
 import { TagScreen } from './screens/TagScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { LockScreen } from './screens/LockScreen';
+import { TabBar } from './components/TabBar';
 
 /** ms until the next local midnight. */
 function untilMidnight(): number {
@@ -67,28 +68,31 @@ export default function App() {
   if (!secReady) return <div className="paper-grid h-full" />;
   if (appLocked) return <LockScreen />;
 
+  const screen = (() => {
+    switch (route.name) {
+      case 'today':
+        return <DayScreen date={todayISO()} />;
+      case 'day':
+        return <DayScreen date={route.date} />;
+      case 'settings':
+        return <SettingsScreen />;
+      case 'month':
+        return <MonthScreen year={route.year} month={route.month} />;
+      case 'year':
+        return <YearScreen year={route.year} />;
+      case 'search':
+        return <SearchScreen />;
+      case 'highlights':
+        return <HighlightsScreen />;
+      case 'tag':
+        return <TagScreen tag={route.tag} />;
+    }
+  })();
+
   return (
-    <div className="h-full">
-      {(() => {
-        switch (route.name) {
-          case 'today':
-            return <DayScreen date={todayISO()} />;
-          case 'day':
-            return <DayScreen date={route.date} />;
-          case 'settings':
-            return <SettingsScreen />;
-          case 'month':
-            return <MonthScreen year={route.year} month={route.month} />;
-          case 'year':
-            return <YearScreen year={route.year} />;
-          case 'search':
-            return <SearchScreen />;
-          case 'highlights':
-            return <HighlightsScreen />;
-          case 'tag':
-            return <TagScreen tag={route.tag} />;
-        }
-      })()}
+    <div className="flex h-full flex-col">
+      <main className="min-h-0 flex-1">{screen}</main>
+      <TabBar />
     </div>
   );
 }
