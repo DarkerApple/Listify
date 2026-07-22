@@ -3,6 +3,8 @@ import { useJournalStore } from './store/useJournalStore';
 import { useRoute } from './router/useRoute';
 import { todayISO } from './lib/date';
 import { DayScreen } from './screens/DayScreen';
+import { MonthScreen } from './screens/MonthScreen';
+import { YearScreen } from './screens/YearScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { Placeholder } from './screens/Placeholder';
 
@@ -50,9 +52,9 @@ export default function App() {
           case 'settings':
             return <SettingsScreen />;
           case 'month':
-            return <Placeholder title="Notestacks" note="The month's notestacks arrive in Stage 3." />;
+            return <MonthScreen year={route.year} month={route.month} />;
           case 'year':
-            return <Placeholder title="Shelf" note="The year shelf arrives in Stage 3." />;
+            return <YearScreen year={route.year} />;
           case 'search':
             return <Placeholder title="Search" note="Search arrives in Stage 4." />;
           case 'highlights':

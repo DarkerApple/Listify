@@ -2,6 +2,15 @@ import type { ISODate, Timestamp } from '../storage/types';
 
 const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
 
+export const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+export function daysInMonth(year: number, month: number): number {
+  return new Date(year, month + 1, 0).getDate();
+}
+
 /** Local-time ISO date key, e.g. "2026-12-24". */
 export function toISODate(d: Date): ISODate {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
