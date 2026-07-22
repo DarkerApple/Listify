@@ -75,3 +75,11 @@ export function navigate(route: Route): void {
   const next = toHash(route);
   if (window.location.hash !== next) window.location.hash = next;
 }
+
+/** Open a day, normalizing today to the home route. */
+export function openDay(date: ISODate): void {
+  const now = new Date();
+  const pad2 = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+  const today = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
+  navigate(date === today ? { name: 'today' } : { name: 'day', date });
+}

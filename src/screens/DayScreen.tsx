@@ -12,6 +12,7 @@ import { Composer } from '../components/Composer';
 import { Toolbar } from '../components/Toolbar';
 import { SealStamp } from '../components/SealStamp';
 import { MoodStar } from '../components/MoodStar';
+import { TagEditor } from '../components/TagEditor';
 
 function gapFor(prevTs: number | null, ts: number): number {
   if (prevTs === null) return 4;
@@ -121,6 +122,7 @@ export function DayScreen({ date }: { date: ISODate }) {
             <Toolbar date={date} />
           </div>
           {note && <MoodStar note={note} />}
+          {note && (note.entries.length > 0 || note.tags.length > 0) && <TagEditor note={note} />}
         </header>
 
         {/* Entries */}

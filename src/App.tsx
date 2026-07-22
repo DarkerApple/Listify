@@ -5,8 +5,10 @@ import { todayISO } from './lib/date';
 import { DayScreen } from './screens/DayScreen';
 import { MonthScreen } from './screens/MonthScreen';
 import { YearScreen } from './screens/YearScreen';
+import { SearchScreen } from './screens/SearchScreen';
+import { HighlightsScreen } from './screens/HighlightsScreen';
+import { TagScreen } from './screens/TagScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
-import { Placeholder } from './screens/Placeholder';
 
 /** ms until the next local midnight. */
 function untilMidnight(): number {
@@ -56,11 +58,11 @@ export default function App() {
           case 'year':
             return <YearScreen year={route.year} />;
           case 'search':
-            return <Placeholder title="Search" note="Search arrives in Stage 4." />;
+            return <SearchScreen />;
           case 'highlights':
-            return <Placeholder title="Highlights" note="Highlights arrive in Stage 4." />;
+            return <HighlightsScreen />;
           case 'tag':
-            return <Placeholder title={`#${route.tag}`} note="Tag filtering arrives in Stage 4." />;
+            return <TagScreen tag={route.tag} />;
         }
       })()}
     </div>

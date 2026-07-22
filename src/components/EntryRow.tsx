@@ -52,7 +52,7 @@ export function EntryRow({
           <TodoIcon state={entry.todoState} onCycle={onCycle} disabled={!editable} />
         )}
         <p className="min-w-0 flex-1 font-serif text-[1.02rem] leading-relaxed">
-          <EntryText text={entry.text} muted={done} />
+          <EntryText text={entry.text} muted={done} interactiveTags />
         </p>
 
         {editable && (
