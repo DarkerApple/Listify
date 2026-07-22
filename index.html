@@ -1,152 +1,21 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Daily Notes</title>
-<style>
-  * { box-sizing: border-box; }
-  body {
-    font-family: system-ui, sans-serif;
-    max-width: 640px;
-    margin: 24px auto;
-    padding: 0 16px;
-    color: #111;
-  }
-  h1 { font-size: 20px; margin: 0 0 12px; }
-  .nav { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-  .nav button { font-size: 18px; width: 32px; height: 32px; cursor: pointer; }
-  .nav b { font-size: 16px; }
-  .days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
-  .day {
-    min-height: 48px; border: 1px solid #ddd; border-radius: 6px;
-    padding: 4px; font-size: 12px; text-align: left; background: #fff; cursor: pointer;
-  }
-  .day.on { border-color: #2a78d6; box-shadow: 0 0 0 1px #2a78d6; }
-  .day .n { font-weight: 600; color: #555; }
-  .day .t { color: #2a78d6; font-size: 10px; }
-  .day.has { background: #f2f7fe; }
-  textarea {
-    width: 100%; min-height: 120px; margin-top: 12px; padding: 8px;
-    font: inherit; border: 1px solid #ccc; border-radius: 6px; resize: vertical;
-  }
-  .stamp { font-size: 12px; color: #888; margin-top: 4px; min-height: 16px; }
-  svg { width: 100%; height: auto; margin-top: 16px; }
-  .grid { stroke: #eee; } .axis { fill: #999; font-size: 10px; }
-  .dot { fill: #2a78d6; }
-</style>
-</head>
-<body>
-  <h1>Daily Notes</h1>
-
-  <div class="nav">
-    <button id="prev">‹</button>
-    <b id="month"></b>
-    <button id="next">›</button>
-  </div>
-
-  <div class="days" id="days"></div>
-
-  <div id="date" style="margin-top:12px;font-weight:600"></div>
-  <textarea id="note" placeholder="Write today's note…"></textarea>
-  <div class="stamp" id="stamp"></div>
-
-  <svg id="plot" viewBox="0 0 640 260"></svg>
-
-<script>
-  var MONTHS = ["January","February","March","April","May","June","July",
-    "August","September","October","November","December"];
-  var notes = JSON.parse(localStorage.getItem("notes") || "{}");
-  var now = new Date();
-  var year = now.getFullYear(), month = now.getMonth();
-  var sel = key(now.getFullYear(), now.getMonth(), now.getDate());
-
-  function pad(n){ return n < 10 ? "0"+n : ""+n; }
-  function key(y,m,d){ return y+"-"+pad(m+1)+"-"+pad(d); }
-  function save(){ localStorage.setItem("notes", JSON.stringify(notes)); }
-  function fmt(iso){
-    var d = new Date(iso), h = d.getHours(), ap = h<12?"AM":"PM", h12 = h%12||12;
-    return h12+":"+pad(d.getMinutes())+" "+ap;
-  }
-
-  function renderDays(){
-    document.getElementById("month").textContent = MONTHS[month]+" "+year;
-    var grid = document.getElementById("days");
-    grid.innerHTML = "";
-    var first = new Date(year, month, 1).getDay();
-    var total = new Date(year, month+1, 0).getDate();
-    for (var i=0;i<first;i++) grid.appendChild(document.createElement("div"));
-    for (var d=1;d<=total;d++){
-      var k = key(year, month, d), note = notes[k];
-      var cell = document.createElement("div");
-      cell.className = "day" + (k===sel?" on":"") + (note?" has":"");
-      cell.dataset.key = k;
-      cell.innerHTML = "<div class='n'>"+d+"</div>" +
-        (note ? "<div class='t'>"+fmt(note.at)+"</div>" : "");
-      grid.appendChild(cell);
-    }
-  }
-
-  function renderEditor(){
-    var p = sel.split("-");
-    document.getElementById("date").textContent =
-      MONTHS[+p[1]-1]+" "+(+p[2])+", "+p[0];
-    var note = notes[sel];
-    document.getElementById("note").value = note ? note.text : "";
-    document.getElementById("stamp").textContent = note ? "Written "+fmt(note.at) : "";
-  }
-
-  function renderPlot(){
-    var svg = document.getElementById("plot");
-    var total = new Date(year, month+1, 0).getDate();
-    var L=40, R=10, T=10, B=24, W=640, H=260;
-    var iw = W-L-R, ih = H-T-B, s = "";
-    function x(day){ return L + (total>1 ? (day-1)/(total-1)*iw : iw/2); }
-    function y(hr){ return T + (1-hr/24)*ih; }
-
-    [0,6,12,18,24].forEach(function(h){
-      s += "<line class='grid' x1='"+L+"' y1='"+y(h)+"' x2='"+(L+iw)+"' y2='"+y(h)+"'/>";
-      var lab = {0:"12a",6:"6a",12:"12p",18:"6p",24:"12a"}[h];
-      s += "<text class='axis' x='"+(L-6)+"' y='"+(y(h)+3)+"' text-anchor='end'>"+lab+"</text>";
-    });
-    for (var d=1; d<=total; d+= (total>20?5:2)){
-      s += "<text class='axis' x='"+x(d)+"' y='"+(H-8)+"' text-anchor='middle'>"+d+"</text>";
-    }
-    for (var k in notes){
-      if (k.indexOf(year+"-"+pad(month+1)+"-")===0){
-        var day = +k.split("-")[2], hr = new Date(notes[k].at).getHours() + new Date(notes[k].at).getMinutes()/60;
-        s += "<circle class='dot' cx='"+x(day)+"' cy='"+y(hr)+"' r='4'><title>"+
-             MONTHS[month]+" "+day+" — "+fmt(notes[k].at)+"</title></circle>";
-      }
-    }
-    svg.innerHTML = s;
-  }
-
-  function render(){ renderDays(); renderEditor(); renderPlot(); }
-
-  document.getElementById("days").addEventListener("click", function(e){
-    var cell = e.target.closest(".day");
-    if (cell && cell.dataset.key){ sel = cell.dataset.key; render(); document.getElementById("note").focus(); }
-  });
-
-  document.getElementById("note").addEventListener("input", function(){
-    var text = this.value;
-    if (text.trim()){
-      if (notes[sel]) notes[sel].text = text;
-      else notes[sel] = { text: text, at: new Date().toISOString() };
-    } else {
-      delete notes[sel];
-    }
-    save();
-    renderDays();
-    renderPlot();
-    document.getElementById("stamp").textContent = notes[sel] ? "Written "+fmt(notes[sel].at) : "";
-  });
-
-  document.getElementById("prev").onclick = function(){ if(--month<0){month=11;year--;} render(); };
-  document.getElementById("next").onclick = function(){ if(++month>11){month=0;year++;} render(); };
-
-  render();
-</script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5"
+    />
+    <meta name="theme-color" content="#f7f4ec" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#1c1a17" media="(prefers-color-scheme: dark)" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%97%92%EF%B8%8F%3C/text%3E%3C/svg%3E"
+    />
+    <title>Listify</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>
