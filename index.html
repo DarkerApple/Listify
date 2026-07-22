@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Listify — daily notes</title>
+  <meta name="description" content="A simple daily note app. Each day is a note, each month is a notepad, and it plots the time you wrote." />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%97%92%EF%B8%8F%3C/text%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">🗒️</span>
+        <div class="brand-text">
+          <h1>Listify</h1>
+          <p>one note a day · a notepad a month</p>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <button id="importBtn" class="ghost-btn" type="button" title="Import notes from a file">Import</button>
+        <button id="exportBtn" class="ghost-btn" type="button" title="Export all notes to a file">Export</button>
+        <button id="themeBtn" class="ghost-btn icon-btn" type="button" title="Toggle light / dark" aria-label="Toggle light or dark theme">
+          <span class="theme-icon">☾</span>
+        </button>
+        <input id="importInput" type="file" accept="application/json" hidden />
+      </div>
+    </header>
+
+    <nav class="toolbar" aria-label="Notepad navigation">
+      <div class="month-nav">
+        <button id="prevMonth" class="nav-btn" type="button" aria-label="Previous month">‹</button>
+        <div class="month-label">
+          <span id="monthName">Month</span>
+          <span id="yearName" class="year">0000</span>
+        </div>
+        <button id="nextMonth" class="nav-btn" type="button" aria-label="Next month">›</button>
+      </div>
+      <button id="todayBtn" class="today-btn" type="button">Today</button>
+    </nav>
+
+    <main class="layout">
+      <section class="notepad-pane">
+        <div class="notepad" id="notepad" aria-label="Month notepad">
+          <div class="weekday-row" id="weekdayRow"></div>
+          <div class="days-grid" id="daysGrid"></div>
+        </div>
+      </section>
+
+      <aside class="editor-pane">
+        <div class="editor" id="editor">
+          <div class="editor-head">
+            <div class="editor-date">
+              <span id="editorWeekday" class="editor-weekday">—</span>
+              <span id="editorFullDate" class="editor-fulldate">Select a day</span>
+            </div>
+            <button id="clearNote" class="danger-btn" type="button" title="Clear this day's note" hidden>Clear</button>
+          </div>
+          <textarea id="noteInput" class="note-input" placeholder="Write today's note…" spellcheck="true" aria-label="Note text"></textarea>
+          <div class="editor-foot">
+            <div class="stamp" id="noteStamp"></div>
+            <div class="save-state" id="saveState" aria-live="polite"></div>
+          </div>
+        </div>
+      </aside>
+    </main>
+
+    <section class="plot-pane">
+      <div class="plot-head">
+        <div>
+          <h2 class="plot-title">When you wrote</h2>
+          <p class="plot-sub" id="plotSub">Time of day each note was written this month</p>
+        </div>
+        <div class="stat-row" id="statRow"></div>
+      </div>
+      <div class="plot-wrap" id="plotWrap">
+        <svg id="plot" class="plot-svg" role="img" aria-label="Scatter plot of writing time of day by day of month"></svg>
+        <div class="plot-tooltip" id="plotTooltip" hidden></div>
+      </div>
+      <p class="plot-empty" id="plotEmpty" hidden>No notes yet this month — pick a day and start writing.</p>
+    </section>
+
+    <footer class="footer">
+      <span>Your notes live only in this browser (local storage). Use Export to keep a copy.</span>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
