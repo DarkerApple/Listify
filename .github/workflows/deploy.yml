@@ -2,12 +2,12 @@ name: Deploy to GitHub Pages
 
 # Builds the Vite app and publishes dist/ to GitHub Pages.
 # One-time setup: repo Settings → Pages → Source = "GitHub Actions".
-# Pages deploys from the default branch, so merge this branch into the default
-# branch (or run this workflow manually) to publish.
+# Runs on the repo's current default branch (claude/daily-note-web-app-mw71fn)
+# as well as main/master, so it also works after you rename/merge to main.
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, claude/daily-note-web-app-mw71fn]
   workflow_dispatch:
 
 permissions:
