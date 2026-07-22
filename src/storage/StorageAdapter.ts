@@ -26,4 +26,8 @@ export interface StorageAdapter {
 
   /** Merge a bundle back in. Existing days are overwritten by imported ones. */
   import(bundle: ExportBundle): Promise<void>;
+
+  /** Small key-value store for app config (security records, counters). */
+  getMeta<T>(key: string): Promise<T | undefined>;
+  setMeta<T>(key: string, value: T): Promise<void>;
 }

@@ -56,6 +56,15 @@ class DexieStorageAdapter implements StorageAdapter {
     }
     await db.notes.bulkPut(bundle.notes);
   }
+
+  async getMeta<T>(key: string): Promise<T | undefined> {
+    const row = await db.meta.get(key);
+    return row?.value as T | undefined;
+  }
+
+  async setMeta<T>(key: string, value: T): Promise<void> {
+    await db.meta.put({ key, value });
+  }
 }
 
 export const storage: StorageAdapter = new DexieStorageAdapter();

@@ -6,6 +6,7 @@ import { newId } from '../lib/id';
 import { parseTags, STARTER_TAGS } from '../lib/tags';
 import { tick } from '../lib/haptics';
 import { useSettings } from './useSettings';
+import { useSecurity } from './useSecurity';
 
 const TODO_CYCLE: Exclude<TodoState, null>[] = ['want', 'have-to', 'done'];
 
@@ -72,6 +73,9 @@ interface JournalState {
   toggleStar(date: ISODate): Promise<void>;
   addTag(date: ISODate, tag: string): Promise<void>;
   removeTag(date: ISODate, tag: string): Promise<void>;
+
+  // Vault: encrypt/decrypt a day's entries at rest (requires the vault open).
+  togglePrivate(date: ISODate): Promise<void>;
 }
 
 export const useJournalStore = create<JournalState>((set, get) => {
@@ -129,8 +133,13 @@ export const useJournalStore = create<JournalState>((set, get) => {
     async commitEntry(raw) {
       const text = raw.trim();
       if (!text) return;
-      const { date } = get();
+      const { date, note: current } = get();
       const { text: body, isTodo } = detectTodo(text);
+
+      // Private days encrypt entry text at rest and never store cleartext tags.
+      const isPrivate = !!current?.private;
+      const storedText = isPrivate ? await useSecurity.getState().encrypt(body) : body;
+      const tags = isPrivate ? [] : parseTags(body);
 
       await mutate(
         date,
@@ -138,14 +147,19 @@ export const useJournalStore = create<JournalState>((set, get) => {
           if (note.sealed) return null;
           const entry: Entry = {
             id: newId(),
-            text: body,
+            text: storedText,
             createdAt: Date.now(),
             type: isTodo ? 'todo' : 'text',
             todoState: isTodo ? 'want' : null,
-            tags: parseTags(body),
+            tags,
           };
           const entries = [...note.entries, entry];
-          return { ...note, entries, tags: aggregateTags(entries), updatedAt: Date.now() };
+          return {
+            ...note,
+            entries,
+            tags: isPrivate ? note.tags : aggregateTags(entries),
+            updatedAt: Date.now(),
+          };
         },
         true,
       );
@@ -225,6 +239,40 @@ export const useJournalStore = create<JournalState>((set, get) => {
         if (!metaEditable(note)) return null;
         return { ...note, tags: note.tags.filter((t) => t !== tag), updatedAt: Date.now() };
       });
+    },
+
+    async togglePrivate(date) {
+      const sec = useSecurity.getState();
+      if (!sec.vaultKey) return; // gated by UI (vault must be open)
+      const current = get();
+      const note =
+        date === current.date && current.note ? current.note : await storage.getNote(date);
+      if (!note || note.sealed) return; // encrypting alters entry bytes → pre-seal only
+
+      let updated: Note;
+      if (!note.private) {
+        const entries = await Promise.all(
+          note.entries.map(async (e) => ({ ...e, text: await sec.encrypt(e.text), tags: [] })),
+        );
+        updated = { ...note, entries, private: true, tags: [], updatedAt: Date.now() };
+      } else {
+        const entries = await Promise.all(
+          note.entries.map(async (e) => {
+            const pt = await sec.decrypt(e.text);
+            return { ...e, text: pt, tags: parseTags(pt) };
+          }),
+        );
+        updated = {
+          ...note,
+          entries,
+          private: false,
+          tags: aggregateTags(entries),
+          updatedAt: Date.now(),
+        };
+      }
+
+      await storage.upsertNote(updated);
+      set((s) => ({ revision: s.revision + 1, note: date === s.date ? updated : s.note }));
     },
   };
 });

@@ -1,5 +1,6 @@
 import { useEffect, useReducer } from 'react';
 import { useJournalStore } from './store/useJournalStore';
+import { useSecurity } from './store/useSecurity';
 import { useRoute } from './router/useRoute';
 import { todayISO } from './lib/date';
 import { DayScreen } from './screens/DayScreen';
@@ -9,6 +10,7 @@ import { SearchScreen } from './screens/SearchScreen';
 import { HighlightsScreen } from './screens/HighlightsScreen';
 import { TagScreen } from './screens/TagScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
+import { LockScreen } from './screens/LockScreen';
 
 /** ms until the next local midnight. */
 function untilMidnight(): number {
@@ -21,12 +23,30 @@ export default function App() {
   const init = useJournalStore((s) => s.init);
   const sweep = useJournalStore((s) => s.sweepAutoSeal);
   const loadDate = useJournalStore((s) => s.loadDate);
+  const secInit = useSecurity((s) => s.init);
+  const secReady = useSecurity((s) => s.ready);
+  const appLocked = useSecurity((s) => s.appLocked);
+  const lockVault = useSecurity((s) => s.lockVault);
   const route = useRoute();
   const [, forceTick] = useReducer((n: number) => n + 1, 0);
 
   useEffect(() => {
+    void secInit();
     void init();
-  }, [init]);
+  }, [secInit, init]);
+
+  // Wipe the in-memory vault key when the app is backgrounded (spec §6).
+  useEffect(() => {
+    function onHide() {
+      if (document.visibilityState === 'hidden') lockVault();
+    }
+    document.addEventListener('visibilitychange', onHide);
+    window.addEventListener('pagehide', lockVault);
+    return () => {
+      document.removeEventListener('visibilitychange', onHide);
+      window.removeEventListener('pagehide', lockVault);
+    };
+  }, [lockVault]);
 
   // At local midnight: seal yesterday, roll the "today" view over.
   useEffect(() => {
@@ -42,6 +62,10 @@ export default function App() {
     arm();
     return () => window.clearTimeout(timer);
   }, [sweep, loadDate]);
+
+  // Hold rendering until we know the lock state, then gate behind the passcode.
+  if (!secReady) return <div className="paper-grid h-full" />;
+  if (appLocked) return <LockScreen />;
 
   return (
     <div className="h-full">
