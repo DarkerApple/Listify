@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import type { Item } from '../types';
 import type { DayGroup, MonthSummary } from '../lib/group';
-import { dayHeading, monthLabel } from '../lib/time';
+import { dayHeading, dayKey, monthLabel } from '../lib/time';
 
 interface Props {
   monthKey: string;
@@ -11,6 +11,10 @@ interface Props {
   renderItem: (item: Item) => ReactNode;
   /** Shown on the page itself when there's nothing to rule out. */
   empty?: ReactNode;
+  /** The writing line, kept at the bottom of the page. */
+  footer?: ReactNode;
+  /** Only today's page gets a day rule above the writing line. */
+  footerUnderToday?: boolean;
   children?: ReactNode;
 }
 
@@ -19,10 +23,24 @@ interface Props {
  * one page — a title, a progress line, day rules down the margin, and the items
  * themselves as ruled lines rather than separate cards.
  */
-export function MonthNote({ monthKey: key, summary, days, renderItem, empty, children }: Props) {
+export function MonthNote({
+  monthKey: key,
+  summary,
+  days,
+  renderItem,
+  empty,
+  footer,
+  footerUnderToday = false,
+  children,
+}: Props) {
   const total = summary?.total ?? 0;
   const done = summary?.done ?? 0;
   const pct = total ? Math.round((done / total) * 100) : 0;
+
+  // The writing line joins today's section when there is one, so writing a
+  // second note today doesn't stamp a second "Today" across the page.
+  const today = dayKey(Date.now());
+  const joinsToday = footerUnderToday && days.length > 0 && days[days.length - 1].key === today;
 
   return (
     <article className="surface hairline overflow-hidden rounded-2xl border shadow-sheet">
@@ -57,23 +75,41 @@ export function MonthNote({ monthKey: key, summary, days, renderItem, empty, chi
 
       {days.length === 0 && empty}
 
-      {days.map((day) => {
+      {days.map((day, i) => {
         const heading = dayHeading(day.at);
+        const last = i === days.length - 1;
         return (
           <section key={day.key} className="hairline border-t first-of-type:border-t-0">
-            <h2
-              className="surface sticky z-10 flex items-baseline gap-2 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] sm:px-6"
-              style={{ top: 'calc(var(--header-h) + var(--tabs-h))' }}
-            >
-              {heading.primary}
-              <span className="muted font-normal normal-case tracking-normal">
-                {heading.secondary}
-              </span>
-            </h2>
+            <DayRule primary={heading.primary} secondary={heading.secondary} />
             <ul>{day.items.map((item) => renderItem(item))}</ul>
+            {last && joinsToday && footer}
           </section>
         );
       })}
+
+      {footer && !joinsToday && (
+        <section className="hairline border-t first-of-type:border-t-0">
+          {footerUnderToday && (
+            <DayRule
+              primary={dayHeading(Date.now()).primary}
+              secondary={dayHeading(Date.now()).secondary}
+            />
+          )}
+          {footer}
+        </section>
+      )}
     </article>
+  );
+}
+
+function DayRule({ primary, secondary }: { primary: string; secondary: string }) {
+  return (
+    <h2
+      className="surface sticky z-10 flex items-baseline gap-2 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] sm:px-6"
+      style={{ top: 'calc(var(--header-h) + var(--tabs-h))' }}
+    >
+      {primary}
+      <span className="muted font-normal normal-case tracking-normal">{secondary}</span>
+    </h2>
   );
 }

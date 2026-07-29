@@ -6,7 +6,7 @@ import { byMonth, dayGroups, filterItems, inMonth, monthSummaries } from './lib/
 import type { MonthSummary } from './lib/group';
 import { currentMonthKey, monthLabel } from './lib/time';
 import { exportJSON, parseImport } from './lib/storage';
-import { Composer } from './components/Composer';
+import { InlineComposer } from './components/InlineComposer';
 import { MonthTabs } from './components/MonthTabs';
 import { MonthNote } from './components/MonthNote';
 import { NoteRow } from './components/NoteRow';
@@ -86,27 +86,32 @@ export default function App() {
 
   const textById = useMemo(() => new Map(items.map((i) => [i.id, i.text])), [items]);
 
+  /** Writing happens on the current month's page, so go there first. */
   const focusComposer = useCallback(() => {
-    composerRef.current?.focus();
-  }, []);
+    setActiveMonth(thisMonth);
+    setSearching(false);
+    requestAnimationFrame(() => {
+      composerRef.current?.focus();
+      composerRef.current?.scrollIntoView({ block: 'center' });
+    });
+  }, [thisMonth]);
 
   function handleCapture(text: string) {
     const added = capture(text);
     if (!added) return;
-    // A new thought belongs to today, so follow it to the current month's page.
-    setActiveMonth(thisMonth);
     setSearching(false);
     setQuery('');
+    // A note written under a "Done" filter would vanish as you wrote it.
+    setFilter('all');
     justCaptured.current = true;
   }
 
-  // Newest lines sit at the bottom of the page — scroll to them after capture.
+  // Writing happens at the bottom of the page — keep the line you're on in view
+  // as the page grows above it.
   useEffect(() => {
     if (!justCaptured.current) return;
     justCaptured.current = false;
-    requestAnimationFrame(() =>
-      window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' }),
-    );
+    requestAnimationFrame(() => composerRef.current?.scrollIntoView({ block: 'center' }));
   }, [items]);
 
   const step = useCallback(
@@ -307,7 +312,7 @@ export default function App() {
       <main
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
-        className="mx-auto max-w-2xl px-3 pb-36 pt-4 sm:px-4 sm:pt-6"
+        className="mx-auto max-w-2xl px-3 pb-16 pt-4 sm:px-4 sm:pt-6"
       >
         {searchMode ? (
           <div className="space-y-4">
@@ -341,6 +346,21 @@ export default function App() {
                 onReset={() => setFilter('all')}
               />
             }
+            footerUnderToday={activeMonth === thisMonth}
+            footer={
+              activeMonth === thisMonth ? (
+                <InlineComposer ref={composerRef} onCapture={handleCapture} />
+              ) : (
+                // Older pages are read-only: writing always belongs to today.
+                <button
+                  type="button"
+                  onClick={focusComposer}
+                  className="muted w-full px-4 py-4 text-left text-[13px] transition hover:text-[rgb(var(--text))] sm:px-6"
+                >
+                  Write on {monthLabel(thisMonth)}’s page →
+                </button>
+              )
+            }
           >
             {counts.all > 0 && <FilterTabs filter={filter} onFilter={setFilter} counts={counts} />}
           </MonthNote>
@@ -348,9 +368,7 @@ export default function App() {
 
         {!searchMode && (
           <p className="muted mt-6 text-center text-[11px]">
-            <span className="hidden sm:inline">
-              ← → for months · N to capture · / to search ·{' '}
-            </span>
+            <span className="hidden sm:inline">← → for months · N to write · / to search · </span>
             <span className="sm:hidden">Swipe left or right for other months · </span>
             saved in this browser only
           </p>
@@ -359,14 +377,12 @@ export default function App() {
 
       <div
         className="pointer-events-none fixed inset-x-0 z-40 flex justify-center px-3"
-        style={{ bottom: 'calc(env(safe-area-inset-bottom) + 84px)' }}
+        style={{ bottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}
       >
         {lastRemoved && (
           <UndoToast text={lastRemoved.item.text} onUndo={undoRemove} onDismiss={dismissUndo} />
         )}
       </div>
-
-      <Composer ref={composerRef} onCapture={handleCapture} viewingPast={activeMonth !== thisMonth} />
     </div>
   );
 }

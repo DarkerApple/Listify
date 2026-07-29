@@ -96,6 +96,13 @@
     }
   }
 
+  /* The writing line is page, not UI: its caret is the focus indicator, so it
+     opts out of the global focus ring instead of drawing a box mid-sentence. */
+  .no-ring:focus-visible {
+    outline: none;
+    box-shadow: none;
+  }
+
   .no-scrollbar {
     scrollbar-width: none;
   }

@@ -6,11 +6,11 @@ interface Props {
 const COPY: Record<Props['kind'], { title: string; body: string; action?: string }> = {
   fresh: {
     title: 'A blank page',
-    body: 'Type a thought below and press Enter — it lands on this month’s page as a checkbox. Paste a whole brain-dump and every line becomes its own item.',
+    body: 'Start writing on the line below. Enter breaks the line, Enter twice finishes that thought and starts the next — and each one becomes a checkbox.',
   },
   month: {
     title: 'Nothing this month',
-    body: 'This page is empty. Anything you capture now files into the current month.',
+    body: 'This page is empty. Anything you write now goes on the current month’s page.',
   },
   filtered: {
     title: 'Nothing to show',

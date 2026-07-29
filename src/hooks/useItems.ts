@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Item } from '../types';
 import { loadItems, saveItems } from '../lib/storage';
 import { newId } from '../lib/id';
-import { splitIntoItems } from '../lib/parse';
+import { splitIntoNotes } from '../lib/parse';
 
 export interface RemovedItem {
   item: Item;
@@ -27,9 +27,9 @@ export function useItems() {
     if (undoTimer.current) window.clearTimeout(undoTimer.current);
   }, []);
 
-  /** Capture raw composer text. Multi-line input becomes multiple items. */
+  /** Capture what was written. A blank line between thoughts splits them. */
   const capture = useCallback((raw: string, parentId: string | null = null): number => {
-    const lines = splitIntoItems(raw);
+    const lines = splitIntoNotes(raw);
     if (lines.length === 0) return 0;
     const now = Date.now();
     const created: Item[] = lines.map((text, i) => ({

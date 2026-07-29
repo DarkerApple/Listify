@@ -150,9 +150,11 @@ export function NoteRow({
           )}
         </div>
 
-        <div className="flex shrink-0 items-center gap-1 pt-px">
+        {/* The time sits in a fixed margin column so stamps line up down the
+            page, and the pointer-only delete never shifts it. */}
+        <div className="flex shrink-0 items-start gap-1 pt-px">
           <time
-            className="muted text-[11px] tabular-nums"
+            className={`muted text-right text-[11px] tabular-nums ${showFullDate ? '' : 'w-14'}`}
             dateTime={new Date(when).toISOString()}
             title={
               item.done && item.doneAt
