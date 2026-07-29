@@ -9,6 +9,17 @@ export function monthKey(ts: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
+/** Sortable day bucket, e.g. "2026-07-29". */
+export function dayKey(ts: number): string {
+  const d = new Date(ts);
+  return `${monthKey(ts)}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** The month a new thought lands in. */
+export function currentMonthKey(now = Date.now()): string {
+  return monthKey(now);
+}
+
 /** "July 2026" — the month section heading. */
 export function monthLabel(key: string): string {
   const [year, month] = key.split('-').map(Number);
@@ -49,6 +60,21 @@ export function dayLabel(ts: number, now = Date.now()): string {
   // "26 Sun" in some locales, which reads like a typo.
   const weekday = d.toLocaleDateString(undefined, { weekday: 'short' });
   return `${weekday} ${d.getDate()}`;
+}
+
+/**
+ * The two-part rule that separates days inside a month sheet: a bold marker
+ * ("Today", "Tue 21") and the fuller date beside it.
+ */
+export function dayHeading(ts: number, now = Date.now()): { primary: string; secondary: string } {
+  const d = new Date(ts);
+  const days = Math.round((startOfDay(now) - startOfDay(ts)) / 86_400_000);
+  if (days === 0 || days === 1) {
+    const weekday = d.toLocaleDateString(undefined, { weekday: 'long' });
+    return { primary: days === 0 ? 'Today' : 'Yesterday', secondary: `${weekday} ${d.getDate()}` };
+  }
+  // Every other day already carries its weekday — no second copy of it.
+  return { primary: dayLabel(ts, now), secondary: '' };
 }
 
 /** "Today · 2:14 PM" — the stamp shown on every item and reply. */

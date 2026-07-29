@@ -90,3 +90,15 @@ export const MenuIcon = (p: Props) => (
     <circle cx="12" cy="19" r="1.4" />
   </Svg>
 );
+
+export const ChevronLeftIcon = (p: Props) => (
+  <Svg {...p}>
+    <path d="M15 5l-7 7 7 7" />
+  </Svg>
+);
+
+export const ChevronRightIcon = (p: Props) => (
+  <Svg {...p}>
+    <path d="M9 5l7 7-7 7" />
+  </Svg>
+);

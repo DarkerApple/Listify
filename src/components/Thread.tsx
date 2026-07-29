@@ -11,8 +11,8 @@ interface Props {
 }
 
 /**
- * An item's thread: the place to keep thinking out loud about one idea. Any
- * message in it can be promoted into its own checklist item.
+ * The thread hanging off one line of the page: where an idea gets talked
+ * through. Any message in it can be promoted into its own checklist item.
  */
 export function Thread({ item, onReply, onRemoveReply, onPromoteReply }: Props) {
   const [draft, setDraft] = useState('');
@@ -22,12 +22,13 @@ export function Thread({ item, onReply, onRemoveReply, onPromoteReply }: Props) 
     const el = boxRef.current;
     if (!el) return;
     el.style.height = 'auto';
-    el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+    el.style.height = `${Math.min(el.scrollHeight, 180)}px`;
   }, [draft]);
 
-  // Opening a thread should put the cursor where you'd type next.
   useLayoutEffect(() => {
-    boxRef.current?.focus();
+    // Opening a thread puts the cursor where you'd type next — but only on a
+    // pointer device, so phone keyboards don't cover the thread you just opened.
+    if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) boxRef.current?.focus();
   }, []);
 
   function submit() {
@@ -38,12 +39,12 @@ export function Thread({ item, onReply, onRemoveReply, onPromoteReply }: Props) 
   }
 
   return (
-    <div className="animate-slide-up pb-3 pl-9 pr-3 pt-1 sm:pl-12">
-      <ol className="space-y-2">
+    <div className="ml-[11px] border-l pl-6" style={{ borderColor: 'rgb(var(--line))' }}>
+      <ol className="space-y-1.5">
         {item.replies.map((reply) => (
           <li
             key={reply.id}
-            className="group/reply hairline relative rounded-xl border border-dashed px-3 py-2"
+            className="group/reply surface hairline relative rounded-xl rounded-tl-sm border px-3 py-2"
           >
             <p className="whitespace-pre-wrap break-words text-[14px] leading-relaxed">
               {reply.text}
@@ -56,12 +57,12 @@ export function Thread({ item, onReply, onRemoveReply, onPromoteReply }: Props) 
               >
                 {stamp(reply.createdAt)}
               </time>
-              <div className="ml-auto flex items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover/reply:opacity-100">
+              <div className="ml-auto flex items-center gap-0.5">
                 <button
                   type="button"
                   onClick={() => onPromoteReply(reply.id)}
                   title="Turn this into a checklist item"
-                  className="muted rounded-lg p-1.5 transition hover:bg-accent-500/10 hover:text-accent-600 dark:hover:text-accent-300"
+                  className="muted rounded-lg p-1.5 transition hover:bg-accent-500/10 hover:text-accent-700 dark:hover:text-accent-300"
                 >
                   <PromoteIcon className="h-[15px] w-[15px]" />
                   <span className="sr-only">Turn into a checklist item</span>
@@ -81,7 +82,7 @@ export function Thread({ item, onReply, onRemoveReply, onPromoteReply }: Props) 
         ))}
       </ol>
 
-      <div className="mt-2 flex items-end gap-2">
+      <div className="mt-1.5 flex items-end gap-2">
         <textarea
           ref={boxRef}
           value={draft}
@@ -95,14 +96,14 @@ export function Thread({ item, onReply, onRemoveReply, onPromoteReply }: Props) 
           rows={1}
           placeholder={item.replies.length ? 'Keep going…' : 'Elaborate on this idea…'}
           aria-label="Add to this thread"
-          className="autosize hairline min-h-[2.25rem] flex-1 rounded-xl border bg-transparent px-3 py-2 text-[14px] leading-relaxed placeholder:text-ink-400 focus:border-accent-400 focus:outline-none dark:placeholder:text-ink-500"
+          className="surface hairline min-h-[36px] flex-1 resize-none rounded-xl border px-3 py-2 text-[14px] leading-snug placeholder:text-ink-400 focus:border-accent-400 focus:outline-none dark:placeholder:text-ink-500"
         />
         <button
           type="button"
           onClick={submit}
           disabled={!draft.trim()}
           aria-label="Add to thread"
-          className="mb-px flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-500 text-white transition enabled:hover:bg-accent-600 enabled:active:scale-95 disabled:opacity-25"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent-600 text-white transition enabled:hover:bg-accent-700 enabled:active:scale-95 disabled:opacity-25 dark:bg-accent-500"
         >
           <ArrowUpIcon className="h-4 w-4" />
         </button>

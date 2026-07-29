@@ -1,21 +1,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { Filter } from './types';
+import type { Filter, Item } from './types';
 import { useItems } from './hooks/useItems';
 import { useTheme } from './hooks/useTheme';
-import { allMonthKeys, groupByMonth } from './lib/group';
+import { byMonth, dayGroups, filterItems, inMonth, monthSummaries } from './lib/group';
+import type { MonthSummary } from './lib/group';
+import { currentMonthKey, monthLabel } from './lib/time';
 import { exportJSON, parseImport } from './lib/storage';
 import { Composer } from './components/Composer';
-import { Toolbar } from './components/Toolbar';
-import { MonthNav } from './components/MonthNav';
-import { MonthSection } from './components/MonthSection';
-import { ItemRow } from './components/ItemRow';
+import { MonthTabs } from './components/MonthTabs';
+import { MonthNote } from './components/MonthNote';
+import { NoteRow } from './components/NoteRow';
+import { FilterTabs } from './components/FilterTabs';
+import { SearchBar } from './components/SearchBar';
 import { EmptyState } from './components/EmptyState';
 import { UndoToast } from './components/UndoToast';
 import { Menu } from './components/Menu';
-import { MoonIcon, PlusIcon, SunIcon } from './components/icons';
+import { ChevronLeftIcon, ChevronRightIcon, MoonIcon, SearchIcon, SunIcon } from './components/icons';
 
-/** Height of the sticky top bar; month headings and jump targets align to it. */
-const HEADER_OFFSET = 56;
+const EMPTY_MONTH = (key: string): MonthSummary => ({ key, total: 0, done: 0, open: 0, threads: 0 });
 
 export default function App() {
   const {
@@ -35,86 +37,137 @@ export default function App() {
   } = useItems();
   const { theme, toggle: toggleTheme } = useTheme();
 
+  const thisMonth = currentMonthKey();
+  const [activeMonth, setActiveMonth] = useState(thisMonth);
   const [filter, setFilter] = useState<Filter>('all');
   const [query, setQuery] = useState('');
+  const [searching, setSearching] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [activeMonth, setActiveMonth] = useState<string | null>(null);
-  const [scrolled, setScrolled] = useState(false);
 
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const searchRef = useRef<HTMLInputElement | null>(null);
-  const sectionRefs = useRef(new Map<string, HTMLElement>());
+  const justCaptured = useRef(false);
 
-  const groups = useMemo(() => groupByMonth(items, filter, query), [items, filter, query]);
-  const months = useMemo(() => allMonthKeys(items), [items]);
+  // The current month always has a page, even before anything is written on it.
+  const months = useMemo(() => {
+    const list = monthSummaries(items);
+    if (!list.some((m) => m.key === thisMonth)) list.push(EMPTY_MONTH(thisMonth));
+    return list.sort((a, b) => a.key.localeCompare(b.key));
+  }, [items, thisMonth]);
+
+  // A month can disappear when its last item is deleted — land somewhere real.
+  useEffect(() => {
+    if (!months.some((m) => m.key === activeMonth)) {
+      setActiveMonth(months[months.length - 1]?.key ?? thisMonth);
+    }
+  }, [months, activeMonth, thisMonth]);
+
+  const summary = months.find((m) => m.key === activeMonth);
+  const monthItems = useMemo(() => inMonth(items, activeMonth), [items, activeMonth]);
+
   const counts = useMemo(() => {
-    const done = items.filter((i) => i.done).length;
-    return { all: items.length, open: items.length - done, done };
-  }, [items]);
+    const done = monthItems.filter((i) => i.done).length;
+    return { all: monthItems.length, open: monthItems.length - done, done };
+  }, [monthItems]);
 
-  // Parent text for items that were split out of a thread.
+  const trimmedQuery = query.trim();
+  const searchMode = searching && trimmedQuery.length > 0;
+
+  const days = useMemo(
+    () => dayGroups(filterItems(monthItems, filter, '')),
+    [monthItems, filter],
+  );
+
+  const results = useMemo(() => {
+    if (!searchMode) return [];
+    return byMonth(filterItems(items, filter, trimmedQuery));
+  }, [items, filter, trimmedQuery, searchMode]);
+  const resultCount = results.reduce((sum, group) => sum + group.items.length, 0);
+
   const textById = useMemo(() => new Map(items.map((i) => [i.id, i.text])), [items]);
 
-  const registerRef = useCallback((key: string, node: HTMLElement | null) => {
-    if (node) sectionRefs.current.set(key, node);
-    else sectionRefs.current.delete(key);
-  }, []);
-
-  // Track which month is under the header so the jump bar shows where you are.
-  useEffect(() => {
-    let frame = 0;
-    function update() {
-      frame = 0;
-      setScrolled(window.scrollY > 120);
-      let current: string | null = null;
-      for (const group of groups) {
-        const node = sectionRefs.current.get(group.key);
-        if (node && node.getBoundingClientRect().top <= HEADER_OFFSET + 24) current = group.key;
-      }
-      setActiveMonth(current ?? groups[0]?.key ?? null);
-    }
-    function onScroll() {
-      if (!frame) frame = requestAnimationFrame(update);
-    }
-    update();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => {
-      window.removeEventListener('scroll', onScroll);
-      if (frame) cancelAnimationFrame(frame);
-    };
-  }, [groups]);
-
   const focusComposer = useCallback(() => {
-    window.scrollTo({ top: 0 });
-    // Wait for the scroll to start before focusing, or mobile keyboards fight it.
-    requestAnimationFrame(() => composerRef.current?.focus());
+    composerRef.current?.focus();
   }, []);
 
-  // Keyboard shortcuts. They're deliberately few, and never steal a real keystroke.
+  function handleCapture(text: string) {
+    const added = capture(text);
+    if (!added) return;
+    // A new thought belongs to today, so follow it to the current month's page.
+    setActiveMonth(thisMonth);
+    setSearching(false);
+    setQuery('');
+    justCaptured.current = true;
+  }
+
+  // Newest lines sit at the bottom of the page — scroll to them after capture.
+  useEffect(() => {
+    if (!justCaptured.current) return;
+    justCaptured.current = false;
+    requestAnimationFrame(() =>
+      window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' }),
+    );
+  }, [items]);
+
+  const step = useCallback(
+    (direction: -1 | 1) => {
+      const index = months.findIndex((m) => m.key === activeMonth);
+      const next = months[index + direction];
+      if (!next) return;
+      setActiveMonth(next.key);
+      setExpandedId(null);
+      window.scrollTo({ top: 0 });
+    },
+    [months, activeMonth],
+  );
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const target = e.target as HTMLElement | null;
       const typing =
-        target?.isContentEditable ||
-        ['INPUT', 'TEXTAREA', 'SELECT'].includes(target?.tagName ?? '');
-      if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
+        target?.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target?.tagName ?? '');
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
 
+      if (typing) {
+        if (e.key === 'Escape' && searching) setSearching(false);
+        return;
+      }
       if (e.key === 'n' || e.key === 'c') {
         e.preventDefault();
         focusComposer();
       } else if (e.key === '/') {
         e.preventDefault();
-        searchRef.current?.focus();
+        setSearching(true);
+        requestAnimationFrame(() => searchRef.current?.focus());
+      } else if (e.key === 'ArrowLeft') {
+        step(-1);
+      } else if (e.key === 'ArrowRight') {
+        step(1);
       } else if (e.key === 'Escape') {
-        setExpandedId(null);
+        if (expandedId) setExpandedId(null);
+        else if (searching) setSearching(false);
       }
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [focusComposer]);
+  }, [focusComposer, step, expandedId, searching]);
 
-  function jumpToMonth(key: string) {
-    sectionRefs.current.get(key)?.scrollIntoView({ block: 'start' });
+  // Swipe left/right to change month — the gesture a phone user reaches for.
+  const touch = useRef<{ x: number; y: number; t: number } | null>(null);
+  function onTouchStart(e: React.TouchEvent) {
+    const t = e.touches[0];
+    touch.current = { x: t.clientX, y: t.clientY, t: Date.now() };
+  }
+  function onTouchEnd(e: React.TouchEvent) {
+    const start = touch.current;
+    touch.current = null;
+    if (!start || searchMode) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - start.x;
+    const dy = t.clientY - start.y;
+    // Horizontal, decisive, and clearly not a scroll.
+    if (Math.abs(dx) < 64 || Math.abs(dx) < Math.abs(dy) * 2 || Date.now() - start.t > 600) return;
+    step(dx < 0 ? 1 : -1);
   }
 
   function handleExport() {
@@ -139,49 +192,87 @@ export default function App() {
     if (ok) replaceAll(parsed);
   }
 
-  const nothingYet = items.length === 0;
+  const renderRow = (item: Item, showFullDate = false) => (
+    <NoteRow
+      key={item.id}
+      item={item}
+      expanded={expandedId === item.id}
+      onToggleExpand={() => setExpandedId((current) => (current === item.id ? null : item.id))}
+      onToggle={() => toggle(item.id)}
+      onEdit={(text) => edit(item.id, text)}
+      onRemove={() => remove(item.id)}
+      onReply={(text) => reply(item.id, text)}
+      onRemoveReply={(replyId) => removeReply(item.id, replyId)}
+      onPromoteReply={(replyId) => promoteReply(item.id, replyId)}
+      parentText={item.parentId ? textById.get(item.parentId) : undefined}
+      showFullDate={showFullDate}
+    />
+  );
+
+  const index = months.findIndex((m) => m.key === activeMonth);
+  const isEmptyEverywhere = items.length === 0;
 
   return (
     <div className="min-h-dvh">
       <header
-        className="sticky top-0 z-20 h-14"
-        style={{ backgroundColor: 'rgb(var(--paper))' }}
+        className="sticky top-0 z-30"
+        style={{ height: 'var(--header-h)', backgroundColor: 'rgb(var(--paper))' }}
       >
-        <div className="mx-auto flex h-14 max-w-2xl items-center gap-2 px-4">
-          <a
-            href="#top"
-            onClick={(e) => {
-              e.preventDefault();
-              window.scrollTo({ top: 0 });
-            }}
-            className="flex items-center gap-2"
-          >
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent-500 text-white">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
-                <path d="M4 8l2.2 2.2L11 5.5" />
-                <path d="M14.5 8.5H20" />
-                <path d="M4 16.5l2.2 2.2L11 14" />
-                <path d="M14.5 17H20" />
-              </svg>
-            </span>
-            <span className="text-[15px] font-semibold tracking-tight">Listify</span>
-          </a>
-
-          <span className="muted ml-1 hidden text-[12px] sm:inline">
-            catch a thought · get a checklist
+        <div className="mx-auto flex h-full max-w-2xl items-center gap-1 px-3 sm:px-4">
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent-600 text-white dark:bg-accent-500">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
+              <path d="M4 8l2.2 2.2L11 5.5" />
+              <path d="M14.5 8.5H20" />
+              <path d="M4 16.5l2.2 2.2L11 14" />
+              <path d="M14.5 17H20" />
+            </svg>
           </span>
+          <span className="ml-1.5 text-[15px] font-semibold tracking-tight">Listify</span>
 
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex items-center gap-0.5">
+            {/* Month arrows are pointer-friendly; touch users swipe or tap a tab. */}
+            <button
+              type="button"
+              onClick={() => step(-1)}
+              disabled={index <= 0}
+              aria-label="Previous month"
+              className="muted hidden h-9 w-9 items-center justify-center rounded-xl transition hover:text-[rgb(var(--text))] disabled:opacity-25 sm:flex"
+            >
+              <ChevronLeftIcon />
+            </button>
+            <button
+              type="button"
+              onClick={() => step(1)}
+              disabled={index >= months.length - 1}
+              aria-label="Next month"
+              className="muted hidden h-9 w-9 items-center justify-center rounded-xl transition hover:text-[rgb(var(--text))] disabled:opacity-25 sm:flex"
+            >
+              <ChevronRightIcon />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSearching((v) => !v);
+                requestAnimationFrame(() => searchRef.current?.focus());
+              }}
+              aria-label="Search"
+              aria-pressed={searching}
+              className={`flex h-9 w-9 items-center justify-center rounded-xl transition ${
+                searching ? 'text-accent-700 dark:text-accent-300' : 'muted hover:text-[rgb(var(--text))]'
+              }`}
+            >
+              <SearchIcon />
+            </button>
             <button
               type="button"
               onClick={toggleTheme}
               aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-              className="surface hairline muted flex h-9 w-9 items-center justify-center rounded-full border transition hover:text-ink-900 dark:hover:text-ink-100"
+              className="muted flex h-9 w-9 items-center justify-center rounded-xl transition hover:text-[rgb(var(--text))]"
             >
               {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
             </button>
             <Menu
-              doneCount={counts.done}
+              doneCount={items.filter((i) => i.done).length}
               onClearDone={clearDone}
               onExport={handleExport}
               onImport={handleImport}
@@ -190,85 +281,92 @@ export default function App() {
         </div>
       </header>
 
-      <main id="top" className="mx-auto max-w-2xl px-4 pb-32">
-        <div className="space-y-3 pb-4 pt-1">
-          <Composer ref={composerRef} onCapture={(text) => capture(text)} />
-          {!nothingYet && (
-            <>
-              <Toolbar
-                ref={searchRef}
-                filter={filter}
-                onFilter={setFilter}
-                query={query}
-                onQuery={setQuery}
-                counts={counts}
-              />
-              <MonthNav months={months} activeKey={activeMonth} onJump={jumpToMonth} />
-            </>
-          )}
-        </div>
+      {searching ? (
+        <SearchBar
+          ref={searchRef}
+          query={query}
+          onQuery={setQuery}
+          onClose={() => {
+            setSearching(false);
+            setQuery('');
+          }}
+          resultCount={resultCount}
+        />
+      ) : (
+        <MonthTabs
+          months={months}
+          activeKey={activeMonth}
+          onSelect={(key) => {
+            setActiveMonth(key);
+            setExpandedId(null);
+            window.scrollTo({ top: 0 });
+          }}
+        />
+      )}
 
-        {nothingYet ? (
-          <EmptyState kind="fresh" onReset={() => undefined} />
-        ) : groups.length === 0 ? (
-          <EmptyState
-            kind="filtered"
-            onReset={() => {
-              setFilter('all');
-              setQuery('');
-            }}
-          />
-        ) : (
-          <div className="space-y-6">
-            {groups.map((group) => (
-              <MonthSection key={group.key} group={group} registerRef={registerRef}>
-                {group.items.map((item) => (
-                  <ItemRow
-                    key={item.id}
-                    item={item}
-                    expanded={expandedId === item.id}
-                    onToggleExpand={() =>
-                      setExpandedId((current) => (current === item.id ? null : item.id))
-                    }
-                    onToggle={() => toggle(item.id)}
-                    onEdit={(text) => edit(item.id, text)}
-                    onRemove={() => remove(item.id)}
-                    onReply={(text) => reply(item.id, text)}
-                    onRemoveReply={(replyId) => removeReply(item.id, replyId)}
-                    onPromoteReply={(replyId) => promoteReply(item.id, replyId)}
-                    parentText={item.parentId ? textById.get(item.parentId) : undefined}
-                  />
-                ))}
-              </MonthSection>
-            ))}
+      <main
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
+        className="mx-auto max-w-2xl px-3 pb-36 pt-4 sm:px-4 sm:pt-6"
+      >
+        {searchMode ? (
+          <div className="space-y-4">
+            <p className="muted px-1 text-[12px]">
+              {resultCount} {resultCount === 1 ? 'match' : 'matches'} for “{trimmedQuery}”
+            </p>
+            {results.length === 0 ? (
+              <div className="surface hairline rounded-2xl border shadow-sheet">
+                <EmptyState kind="search" />
+              </div>
+            ) : (
+              results.map((group) => (
+                <section key={group.key} className="surface hairline overflow-hidden rounded-2xl border shadow-sheet">
+                  <h2 className="hairline border-b px-4 py-3 font-display text-[19px] sm:px-6">
+                    {monthLabel(group.key)}
+                  </h2>
+                  <ul>{group.items.map((item) => renderRow(item, true))}</ul>
+                </section>
+              ))
+            )}
           </div>
+        ) : (
+          <MonthNote
+            monthKey={activeMonth}
+            summary={summary}
+            days={days}
+            renderItem={(item) => renderRow(item)}
+            empty={
+              <EmptyState
+                kind={isEmptyEverywhere ? 'fresh' : counts.all === 0 ? 'month' : 'filtered'}
+                onReset={() => setFilter('all')}
+              />
+            }
+          >
+            {counts.all > 0 && <FilterTabs filter={filter} onFilter={setFilter} counts={counts} />}
+          </MonthNote>
         )}
 
-        {!nothingYet && (
-          <p className="muted mt-10 text-center text-[11px]">
-            Press <kbd className="font-sans font-medium">N</kbd> to capture ·{' '}
-            <kbd className="font-sans font-medium">/</kbd> to search · saved in this browser only
+        {!searchMode && (
+          <p className="muted mt-6 text-center text-[11px]">
+            <span className="hidden sm:inline">
+              ← → for months · N to capture · / to search ·{' '}
+            </span>
+            <span className="sm:hidden">Swipe left or right for other months · </span>
+            saved in this browser only
           </p>
         )}
       </main>
 
-      {/* Back to the composer once the list has scrolled past it. */}
-      {scrolled && (
-        <button
-          type="button"
-          onClick={focusComposer}
-          aria-label="Capture a new thought"
-          className="animate-pop-in fixed bottom-6 right-5 z-20 flex h-12 w-12 items-center justify-center rounded-full bg-accent-500 text-white shadow-lg transition hover:bg-accent-600 active:scale-95 sm:bottom-8 sm:right-8"
-        >
-          <PlusIcon className="h-5 w-5" />
-        </button>
-      )}
-
-      <div className="pointer-events-none fixed inset-x-0 bottom-5 z-30 flex justify-center px-4">
+      <div
+        className="pointer-events-none fixed inset-x-0 z-40 flex justify-center px-3"
+        style={{ bottom: 'calc(env(safe-area-inset-bottom) + 84px)' }}
+      >
         {lastRemoved && (
           <UndoToast text={lastRemoved.item.text} onUndo={undoRemove} onDismiss={dismissUndo} />
         )}
       </div>
+
+      <Composer ref={composerRef} onCapture={handleCapture} viewingPast={activeMonth !== thisMonth} />
     </div>
   );
 }

@@ -35,9 +35,9 @@ export function useItems() {
     const created: Item[] = lines.map((text, i) => ({
       id: newId(),
       text,
-      // Stagger by a millisecond so a pasted list keeps its typed order when
-      // sorted newest-first.
-      createdAt: now + (lines.length - 1 - i),
+      // Stagger by a millisecond so a pasted list keeps the order it was typed
+      // in once the page is sorted oldest-first.
+      createdAt: now + i,
       done: false,
       doneAt: null,
       replies: [],

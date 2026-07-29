@@ -1,50 +1,80 @@
 import type { Filter, Item } from '../types';
-import { monthKey } from './time';
+import { dayKey, monthKey } from './time';
 
-export interface MonthGroup {
+export interface DayGroup {
   key: string;
+  /** Timestamp of the first item that day — enough to render the heading. */
+  at: number;
   items: Item[];
-  /** Counts for the whole month, before search/filter — so progress stays honest. */
-  total: number;
-  done: number;
 }
 
+export interface MonthSummary {
+  key: string;
+  total: number;
+  done: number;
+  open: number;
+  threads: number;
+}
+
+/** Search covers thread replies too — an idea often lives in its elaboration. */
 function matches(item: Item, query: string): boolean {
   if (!query) return true;
   const q = query.toLowerCase();
-  if (item.text.toLowerCase().includes(q)) return true;
-  // Searching hits thread replies too — ideas often live in the elaboration.
-  return item.replies.some((r) => r.text.toLowerCase().includes(q));
+  return (
+    item.text.toLowerCase().includes(q) ||
+    item.replies.some((r) => r.text.toLowerCase().includes(q))
+  );
+}
+
+export function filterItems(items: Item[], filter: Filter, query: string): Item[] {
+  return items.filter((item) => {
+    const passes = filter === 'all' || (filter === 'open' ? !item.done : item.done);
+    return passes && matches(item, query);
+  });
+}
+
+/** One entry per month that holds anything, oldest first — drives the tab bar. */
+export function monthSummaries(items: Item[]): MonthSummary[] {
+  const map = new Map<string, MonthSummary>();
+  for (const item of items) {
+    const key = monthKey(item.createdAt);
+    const summary = map.get(key) ?? { key, total: 0, done: 0, open: 0, threads: 0 };
+    summary.total += 1;
+    if (item.done) summary.done += 1;
+    else summary.open += 1;
+    if (item.replies.length) summary.threads += 1;
+    map.set(key, summary);
+  }
+  return [...map.values()].sort((a, b) => a.key.localeCompare(b.key));
 }
 
 /**
- * Newest first, bucketed by the month the thought was captured in. Filtering and
- * search narrow the visible items; a month disappears only when nothing matches.
+ * A month reads top to bottom like a page you keep adding to, so items run
+ * oldest first and the newest thought sits closest to the composer.
  */
-export function groupByMonth(items: Item[], filter: Filter, query: string): MonthGroup[] {
-  const buckets = new Map<string, MonthGroup>();
-
-  for (const item of [...items].sort((a, b) => b.createdAt - a.createdAt)) {
-    const key = monthKey(item.createdAt);
-    let group = buckets.get(key);
-    if (!group) {
-      group = { key, items: [], total: 0, done: 0 };
-      buckets.set(key, group);
-    }
-    group.total += 1;
-    if (item.done) group.done += 1;
-
-    const passesFilter = filter === 'all' || (filter === 'open' ? !item.done : item.done);
-    if (passesFilter && matches(item, query)) group.items.push(item);
+export function dayGroups(items: Item[]): DayGroup[] {
+  const map = new Map<string, DayGroup>();
+  for (const item of [...items].sort((a, b) => a.createdAt - b.createdAt)) {
+    const key = dayKey(item.createdAt);
+    const group = map.get(key) ?? { key, at: item.createdAt, items: [] };
+    group.items.push(item);
+    map.set(key, group);
   }
-
-  return [...buckets.values()]
-    .filter((g) => g.items.length > 0)
-    .sort((a, b) => b.key.localeCompare(a.key));
+  return [...map.values()].sort((a, b) => a.key.localeCompare(b.key));
 }
 
-/** Every month that holds anything, newest first — drives the jump bar. */
-export function allMonthKeys(items: Item[]): string[] {
-  const keys = new Set(items.map((i) => monthKey(i.createdAt)));
-  return [...keys].sort((a, b) => b.localeCompare(a));
+export function inMonth(items: Item[], month: string): Item[] {
+  return items.filter((item) => monthKey(item.createdAt) === month);
+}
+
+/** Search results stay grouped by month so hits keep their context. */
+export function byMonth(items: Item[]): { key: string; items: Item[] }[] {
+  const map = new Map<string, Item[]>();
+  for (const item of items) {
+    const key = monthKey(item.createdAt);
+    map.set(key, [...(map.get(key) ?? []), item]);
+  }
+  return [...map.entries()]
+    .map(([key, list]) => ({ key, items: list }))
+    .sort((a, b) => b.key.localeCompare(a.key));
 }
