@@ -2,12 +2,10 @@ name: Deploy to GitHub Pages
 
 # Builds the Vite app and publishes dist/ to GitHub Pages.
 # One-time setup: repo Settings → Pages → Source = "GitHub Actions".
-# Runs on the repo's current default branch (claude/daily-note-web-app-mw71fn)
-# as well as main/master, so it also works after you rename/merge to main.
 
 on:
   push:
-    branches: [main, master, claude/daily-note-web-app-mw71fn]
+    branches: [main, master, claude/notes-checklist-app-08cdb8]
   workflow_dispatch:
 
 permissions:
@@ -15,7 +13,7 @@ permissions:
   pages: write
   id-token: write
 
-# Allow one concurrent deployment; don't cancel an in-progress publish.
+# One deployment at a time; never cancel a publish that's already running.
 concurrency:
   group: pages
   cancel-in-progress: false
@@ -30,7 +28,7 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      # Base path must match the Pages URL (/<repo>/). Derived from the repo name.
+      # Base path must match the Pages URL (/<repo>/), derived from the repo name.
       - name: Build
         run: npm run build
         env:

@@ -1,66 +1,81 @@
-# 🗒️ Listify
+# Listify
 
-A calm, private, **offline-first daily journal** — a PWA that runs entirely in
-your browser. One note per day, a month is a *notestack*, a year is a *shelf*.
-No account, no server, no network required. The only organizing principle is
-time.
+Catch a thought, get a checklist.
 
-## Highlights
+Listify is a single-screen web app for the thoughts that arrive at the wrong moment. You type one
+in, it becomes a checkbox. If it turns out to be an idea rather than a task, you open a thread on it
+and keep thinking. Everything files itself by month, with a plain date and time on every line.
 
-- **Capture loop** — opens on Today with the cursor ready; press **Return** to
-  commit a timestamped entry; a leading `- ` makes a todo that cycles
-  **want → have-to → done**; inline `#hashtags` become tappable chips.
-- **Permanence** — days **seal** automatically at midnight (or manually with a
-  wax-stamp). Sealed words are immutable; mood/tags/star stay editable unless you
-  "freeze completely".
-- **Notestacks & shelf** — browse a month as a physical pile of mood-tinted
-  stickies (riffle to flip, tap to open), see a year as month piles whose
-  thickness reflects activity, and a month-recap **mood ribbon**.
-- **Find** — search across days and tags, filter by tag, and a **Highlights**
-  reel of starred "monumental" days.
-- **Privacy** — an optional app passcode, and an **encrypted vault** (AES-GCM via
-  Web Crypto) for private days whose text is encrypted at rest.
-- **Backup & keepsakes** — export an (optionally encrypted) JSON backup, import
-  it back, and save any month as a paper-style **image**.
-- **PWA** — installable, offline via a service worker, light + warm-dark themes.
+Everything is stored in your browser's `localStorage`. No account, no server, no sync.
 
-## Tech
+## The four ideas
 
-Vite · React · TypeScript · Tailwind · Zustand · Dexie (IndexedDB) · Web Crypto ·
-Framer Motion · @use-gesture. All storage goes through a single `StorageAdapter`
-seam, so a future sync layer needs no UI changes.
+**Capture is one step.** The composer is focused the moment the page opens, sits at the top of the
+screen, and files a thought with `Enter`. There is no "new note" button to press first and no type
+to choose.
 
-## Develop
+**Notes are already a checklist.** Every captured thought is a checkbox — that is the automatic part.
+Paste a whole brain-dump and each line becomes its own item; leading bullets, numbers and `[ ]`
+boxes are stripped, so a rough list copied from anywhere lands clean.
+
+**Ideas get threads.** Any item opens into a thread where you can elaborate over time. When the
+thinking produces an actual next step, one click promotes that message into its own checklist item,
+tagged with the thought it came from.
+
+**Months are the navigation.** Items group under sticky month headings with a done-count and progress
+bar, and a jump bar scrolls to any month in one tap. Each line carries a short stamp —
+`Today · 2:14 PM`, `Sun 26 · 9:03 AM` — with the full date on hover.
+
+## Using it
+
+| Action | How |
+| --- | --- |
+| Capture a thought | Type in the composer, press `Enter` |
+| New line instead of filing | `Shift`+`Enter` |
+| Capture several at once | Paste multiple lines — one item per line |
+| Focus the composer | `N` (or `C`), or the ⊕ button once you've scrolled |
+| Search notes *and* threads | `/` |
+| Edit an item | Double-click its text |
+| Open a thread | **Elaborate** on any item |
+| Promote a thread message to a task | The ☑ button on that message |
+| Close a thread | `Esc` |
+| Undo a delete | **Undo** in the toast (8 seconds) |
+
+Filter tabs switch between **To do**, **Done** and **All**. The ⋮ menu clears completed items and
+exports or imports a JSON backup — worth doing occasionally, since clearing site data clears notes.
+
+## Running it
 
 ```bash
 npm install
-npm run dev        # http://localhost:5173
-npm run build      # typecheck + production build to dist/
-npm run preview
+npm run dev      # http://localhost:5173
+npm run build    # typecheck + production build into dist/
+npm run preview  # serve the production build
 ```
 
-## Deploy to GitHub Pages
+## Deploying
 
-> **Why the site was a blank page:** GitHub Pages serves static files, so it was
-> serving the raw Vite source (`index.html` → `/src/main.tsx`), which only works
-> after a build. The workflow below builds the app and publishes `dist/`.
+Pushing to the default branch builds and publishes to GitHub Pages via
+`.github/workflows/deploy.yml`. One-time setup: **Settings → Pages → Source = GitHub Actions**. The
+workflow passes `BASE_PATH=/<repo>/` so assets resolve on a project site.
 
-1. In the repo: **Settings → Pages → Build and deployment → Source = "GitHub
-   Actions"**.
-2. Make sure this code is on the **default branch** (merge the PR). The included
-   workflow (`.github/workflows/deploy.yml`) runs on pushes to `main`/`master`
-   (or run it manually from the Actions tab).
-3. It builds with `BASE_PATH=/<repo-name>/` so asset paths and the PWA
-   scope/`start_url` match the project-site URL, then deploys.
+## How it's built
 
-The app uses **hash routing** (`#/…`), so deep links resolve on a hard refresh
-without a `404.html` shim. Pages serves over HTTPS automatically, which Web
-Crypto and service workers require.
+React 18 + TypeScript + Vite + Tailwind. No state library, no UI kit, no icon package — two runtime
+dependencies in total.
 
-## Privacy
+```
+src/
+  App.tsx              screen layout, keyboard shortcuts, active-month tracking
+  types.ts             Item + Reply
+  hooks/useItems.ts    every mutation, persisted to localStorage on change
+  hooks/useTheme.ts    light/dark, applied pre-paint in index.html
+  lib/parse.ts         brain-dump -> checklist items
+  lib/group.ts         month bucketing, filtering, search
+  lib/time.ts          month keys and the short date/time stamps
+  lib/storage.ts       load/save/export/import, with validation on read
+  components/          Composer, ItemRow, Thread, MonthSection, MonthNav, Toolbar, ...
+```
 
-Everything is stored locally in IndexedDB (`listify` database). Private notes are
-encrypted at rest; the vault key is derived from a password that is **never
-stored** — if you lose it, those notes are unrecoverable. The app passcode is
-stored only as a salted PBKDF2 hash. Clearing browser data erases the journal, so
-**export a backup** and install the PWA.
+Stored data is validated field-by-field when read, so a corrupt or hand-edited `localStorage` entry
+degrades to an empty list instead of a blank screen.

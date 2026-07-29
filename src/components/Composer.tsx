@@ -1,102 +1,92 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { CornerDownLeft } from 'lucide-react';
-import { useJournalStore } from '../store/useJournalStore';
+import { forwardRef, useLayoutEffect, useRef, useState } from 'react';
+import { ArrowUpIcon } from './icons';
+import { splitIntoItems } from '../lib/parse';
 
-const TRAILING_TAG = /#([\p{L}\p{N}_-]*)$/u;
+interface Props {
+  onCapture: (text: string) => void;
+}
 
 /**
- * The capture input. Bottom-anchored for thumb reach; Return commits the
- * current line as a timestamped entry and clears for the next. A leading "- "
- * makes the entry a todo. Typing "#" opens tag autocomplete (Tab accepts).
+ * The front door. Focused on load, always at the top, Enter to file the thought.
+ * Anything multi-line becomes multiple checklist items, and the hint below says
+ * so before you commit.
  */
-export function Composer({ onCommit }: { onCommit: (text: string) => void }) {
-  const knownTags = useJournalStore((s) => s.knownTags);
-  const [value, setValue] = useState('');
-  const ref = useRef<HTMLTextAreaElement>(null);
+export const Composer = forwardRef<HTMLTextAreaElement, Props>(function Composer({ onCapture }, ref) {
+  const [text, setText] = useState('');
+  const innerRef = useRef<HTMLTextAreaElement | null>(null);
 
-  // Zero taps to start: focus on mount.
-  useEffect(() => {
-    ref.current?.focus();
-  }, []);
+  // Grow to fit the text instead of scrolling inside a fixed box.
+  useLayoutEffect(() => {
+    const el = innerRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 320)}px`;
+  }, [text]);
 
-  const partial = useMemo(() => {
-    const m = value.match(TRAILING_TAG);
-    return m ? m[1].toLowerCase() : null;
-  }, [value]);
+  const pending = splitIntoItems(text).length;
 
-  const suggestions = useMemo(() => {
-    if (partial === null) return [];
-    return knownTags
-      .filter((t) => t.startsWith(partial) && t !== partial)
-      .slice(0, 5);
-  }, [partial, knownTags]);
-
-  function commit() {
-    const text = value.trim();
-    if (!text) return;
-    onCommit(text);
-    setValue('');
-  }
-
-  function acceptSuggestion(tag: string) {
-    setValue((v) => v.replace(TRAILING_TAG, `#${tag} `));
-    ref.current?.focus();
-  }
-
-  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === 'Tab' && suggestions.length > 0) {
-      e.preventDefault();
-      acceptSuggestion(suggestions[0]);
-      return;
-    }
-    // Return commits; Shift+Return inserts a newline within an entry.
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      commit();
-    }
+  function submit() {
+    if (!text.trim()) return;
+    onCapture(text);
+    setText('');
+    innerRef.current?.focus();
   }
 
   return (
-    <div className="relative">
-      {suggestions.length > 0 && (
-        <ul className="absolute bottom-full left-0 mb-2 overflow-hidden rounded-xl border border-rule bg-paper shadow-lg">
-          {suggestions.map((tag, i) => (
-            <li key={tag}>
-              <button
-                type="button"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  acceptSuggestion(tag);
-                }}
-                className="flex w-full items-center gap-2 px-3 py-1.5 text-left font-mono text-sm text-ink-soft hover:bg-rule/40"
-              >
-                <span className="text-accent">#{tag}</span>
-                {i === 0 && <span className="ml-auto text-[0.65rem] text-ink-faint">Tab</span>}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <div className="flex items-end gap-2 rounded-2xl border border-rule bg-paper/80 px-3 py-2 shadow-sm backdrop-blur focus-within:border-accent/50">
+    <div className="surface hairline rounded-2xl border shadow-sm transition-shadow focus-within:shadow-md">
+      <div className="flex items-end gap-2 p-2.5 sm:p-3">
         <textarea
-          ref={ref}
+          ref={(node) => {
+            innerRef.current = node;
+            if (typeof ref === 'function') ref(node);
+            else if (ref) ref.current = node;
+          }}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              submit();
+            }
+            if (e.key === 'Escape') e.currentTarget.blur();
+          }}
           rows={1}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Anything worth remembering…"
-          className="max-h-40 min-h-[1.6rem] flex-1 resize-none bg-transparent font-serif text-[1.05rem] leading-relaxed outline-none placeholder:text-ink-faint"
+          autoFocus
+          placeholder="What's on your mind?"
+          aria-label="Capture a thought"
+          className="autosize min-h-[2.5rem] flex-1 bg-transparent px-2 py-2 text-[15px] leading-relaxed placeholder:text-ink-400 focus:outline-none dark:placeholder:text-ink-500"
         />
         <button
           type="button"
-          onClick={commit}
-          aria-label="Add entry"
-          className="mb-0.5 shrink-0 rounded-full p-1.5 text-ink-faint transition-colors hover:text-accent active:scale-90"
+          onClick={submit}
+          disabled={pending === 0}
+          aria-label={pending > 1 ? `Add ${pending} items` : 'Add item'}
+          className="mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent-500 text-white transition enabled:hover:bg-accent-600 enabled:active:scale-95 disabled:cursor-not-allowed disabled:opacity-30"
         >
-          <CornerDownLeft size={18} />
+          <ArrowUpIcon className="h-[18px] w-[18px]" />
         </button>
       </div>
+
+      <p className="muted hairline border-t px-4 py-2 text-xs">
+        {pending > 1 ? (
+          <span className="text-accent-600 dark:text-accent-300">
+            Adds {pending} checklist items — one per line.
+          </span>
+        ) : (
+          <>
+            <Key>Enter</Key> to add · <Key>Shift</Key>+<Key>Enter</Key> for a new line · every line
+            becomes its own checkbox
+          </>
+        )}
+      </p>
     </div>
+  );
+});
+
+function Key({ children }: { children: React.ReactNode }) {
+  return (
+    <kbd className="hairline surface rounded border px-1 py-px font-sans text-[11px] font-medium">
+      {children}
+    </kbd>
   );
 }
