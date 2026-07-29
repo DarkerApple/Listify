@@ -24,10 +24,13 @@ boxes stripped, in the order you wrote them.
 the thinking produces an actual next step, one tap promotes that message into its own checklist item,
 labelled with the thought it came from.
 
-**A month is one page.** Items aren't cards floating in a feed — they're ruled lines on a single
-sheet, headed by the month, its note count and a completion percentage, and divided by day rules
-(`TODAY · Wednesday 29`, `TUE 21`). Every line's time sits in a small grey margin column on the
-right, sharing one edge all the way down the page, including the line you're currently writing.
+**A month is one page.** Not cards in a feed and not a stack of small notes — one continuous sheet,
+headed by the month, its note count and a completion percentage. There are no day headings: every
+line carries its own small grey time in the right margin, with the date underneath it only when that
+line wasn't written today. A change of day just gets a little more air.
+
+**Timers are something you write.** Put `time(10m)` in a note and it becomes a live clock, right
+where you typed it, counting down and chiming when it's up.
 
 ## Navigating
 
@@ -41,10 +44,41 @@ open. The active tab always scrolls itself into view.
 | Search every month | The 🔍 button, or `/` |
 | Jump to the writing line | `N` (or `C`), or tap the empty page below the last note |
 | Finish a note | `Enter` twice, `Ctrl`/`⌘`+`Enter`, or just look away |
+| Start a timer | Write `time(10m)` in the note |
 | Close a thread or search | `Esc` |
 
 Writing always belongs to today, so older months are read-only pages with a `Write on July 2026's
 page →` link at the bottom; `N` from anywhere takes you to the same place.
+
+## Timers
+
+Write the timer into the sentence and it starts when you finish the note:
+
+```
+Steep the tea time(3m, green tea) then take it off the heat
+Bake the bread time(25m)
+Stand up and stretch time(1h30m)
+```
+
+| Form | Means |
+| --- | --- |
+| `time(90)` | 90 seconds — a bare number is seconds |
+| `time(90s)` `time(10m)` `time(2h)` | with a unit |
+| `time(1h30m)` | combined units |
+| `time(2:30)` | `mm:ss`, or `h:mm:ss` |
+| `time(10m, steep)` | a label, used as the notification's title |
+
+`timer(...)` works the same. Anything unreadable — `time(soon)` — is left alone as ordinary text.
+
+The chip fills as the countdown drains, so a glance down the page shows how far along you are.
+Click it to pause and resume, or reset it; when it's up it says **time's up** and clicking restarts
+it. When one finishes you get a system notification (permission is asked once, on the keystroke that
+starts your first timer), a two-note chime, and a banner in the app — so a blocked or muted
+notification still reaches you.
+
+Timers store an absolute end time, so a running one survives a reload and keeps the right time. They
+only ring while the page is open, though: this app has no background worker, and a timer that
+expired while the tab was closed is shown as finished rather than announced hours late.
 
 ## Using a line
 
@@ -89,16 +123,20 @@ src/
   hooks/useItems.ts    every mutation, persisted to localStorage on change
   hooks/useTheme.ts    light/dark, applied pre-paint in index.html
   lib/parse.ts         what you wrote -> notes (blank line splits, lists split)
-  lib/group.ts         month summaries, day sections, filtering, search
-  lib/time.ts          month/day keys, day rules, short time stamps
+  lib/group.ts         month summaries, page order, filtering, search
+  lib/time.ts          month/day keys and the short margin stamps
+  lib/timer.ts         time(...) tokens, durations, countdown formatting
+  lib/notify.ts        permission, system notification, chime
   lib/storage.ts       load/save/export/import, with validation on read
   components/
     MonthTabs.tsx      the navigation
-    MonthNote.tsx      the month sheet: title, progress, day rules
-    NoteRow.tsx        one ruled line + its expanded panel
+    MonthNote.tsx      the month sheet: title, progress, the page itself
+    NoteRow.tsx        one line + its expanded panel
+    NoteText.tsx       note text with time(...) swapped for live clocks
+    TimerChip.tsx      the clock: countdown, fill, play/pause/reset
     InlineComposer.tsx the live last line of the page
     Thread.tsx         elaboration, and promoting a message to an item
-    FilterTabs, SearchBar, EmptyState, UndoToast, Menu, icons
+    FilterTabs, SearchBar, EmptyState, UndoToast, TimerToast, Menu, icons
 ```
 
 Surfaces are CSS variables (`--paper`, `--card`, `--line`, `--row`), so light and dark are one

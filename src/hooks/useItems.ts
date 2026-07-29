@@ -1,13 +1,36 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Item } from '../types';
+import type { Item, NoteTimer } from '../types';
 import { loadItems, saveItems } from '../lib/storage';
 import { newId } from '../lib/id';
 import { splitIntoNotes } from '../lib/parse';
+import { findTimerTokens, remainingMs } from '../lib/timer';
 
 export interface RemovedItem {
   item: Item;
   /** Where it sat in the array, so undo restores the original order. */
   index: number;
+}
+
+/**
+ * Timers follow the text: one per `time(...)` token, in token order. Writing a
+ * timer starts it — that's the whole point of writing it — and editing a note
+ * keeps any timer whose duration didn't move.
+ */
+function timersFor(text: string, previous: NoteTimer[] = [], now = Date.now()): NoteTimer[] {
+  return findTimerTokens(text).map((token, i) => {
+    const existing = previous[i];
+    if (existing && existing.seconds === token.seconds) {
+      return { ...existing, label: token.label };
+    }
+    return {
+      id: newId(),
+      seconds: token.seconds,
+      label: token.label,
+      endsAt: now + token.seconds * 1000,
+      remainingMs: token.seconds * 1000,
+      state: 'running' as const,
+    };
+  });
 }
 
 /**
@@ -42,6 +65,7 @@ export function useItems() {
       doneAt: null,
       replies: [],
       parentId,
+      timers: timersFor(text, [], now),
     }));
     setItems((prev) => [...created, ...prev]);
     return created.length;
@@ -58,8 +82,72 @@ export function useItems() {
   const edit = useCallback((id: string, text: string) => {
     const trimmed = text.trim();
     if (!trimmed) return;
-    setItems((prev) => prev.map((item) => (item.id === id ? { ...item, text: trimmed } : item)));
+    setItems((prev) =>
+      prev.map((item) =>
+        item.id === id
+          ? { ...item, text: trimmed, timers: timersFor(trimmed, item.timers) }
+          : item,
+      ),
+    );
   }, []);
+
+  const updateTimer = useCallback(
+    (id: string, timerId: string, change: (timer: NoteTimer, now: number) => NoteTimer) => {
+      const now = Date.now();
+      setItems((prev) =>
+        prev.map((item) =>
+          item.id === id
+            ? {
+                ...item,
+                timers: item.timers.map((timer) =>
+                  timer.id === timerId ? change(timer, now) : timer,
+                ),
+              }
+            : item,
+        ),
+      );
+    },
+    [],
+  );
+
+  /** Play/pause. A finished timer restarts from the top. */
+  const toggleTimer = useCallback(
+    (id: string, timerId: string) => {
+      updateTimer(id, timerId, (timer, now) => {
+        if (timer.state === 'running') {
+          return { ...timer, state: 'paused', remainingMs: remainingMs(timer, now), endsAt: null };
+        }
+        const left = timer.state === 'done' ? timer.seconds * 1000 : Math.max(1000, timer.remainingMs);
+        return { ...timer, state: 'running', remainingMs: left, endsAt: now + left };
+      });
+    },
+    [updateTimer],
+  );
+
+  const resetTimer = useCallback(
+    (id: string, timerId: string) => {
+      updateTimer(id, timerId, (timer) => ({
+        ...timer,
+        state: 'paused',
+        remainingMs: timer.seconds * 1000,
+        endsAt: null,
+      }));
+    },
+    [updateTimer],
+  );
+
+  /** Called by the tick loop the moment a running timer reaches zero. */
+  const finishTimer = useCallback(
+    (id: string, timerId: string) => {
+      updateTimer(id, timerId, (timer) => ({
+        ...timer,
+        state: 'done',
+        remainingMs: 0,
+        endsAt: null,
+      }));
+    },
+    [updateTimer],
+  );
 
   const remove = useCallback((id: string) => {
     setItems((prev) => {
@@ -122,6 +210,7 @@ export function useItems() {
         doneAt: null,
         replies: [],
         parentId: parent.id,
+        timers: timersFor(message.text),
       };
       return [
         promoted,
@@ -152,6 +241,9 @@ export function useItems() {
     reply,
     removeReply,
     promoteReply,
+    toggleTimer,
+    resetTimer,
+    finishTimer,
     clearDone,
     replaceAll,
   };

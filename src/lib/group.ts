@@ -1,13 +1,6 @@
 import type { Filter, Item } from '../types';
 import { dayKey, monthKey } from './time';
 
-export interface DayGroup {
-  key: string;
-  /** Timestamp of the first item that day — enough to render the heading. */
-  at: number;
-  items: Item[];
-}
-
 export interface MonthSummary {
   key: string;
   total: number;
@@ -50,17 +43,16 @@ export function monthSummaries(items: Item[]): MonthSummary[] {
 
 /**
  * A month reads top to bottom like a page you keep adding to, so items run
- * oldest first and the newest thought sits closest to the composer.
+ * oldest first and the newest thought sits closest to where you write.
  */
-export function dayGroups(items: Item[]): DayGroup[] {
-  const map = new Map<string, DayGroup>();
-  for (const item of [...items].sort((a, b) => a.createdAt - b.createdAt)) {
-    const key = dayKey(item.createdAt);
-    const group = map.get(key) ?? { key, at: item.createdAt, items: [] };
-    group.items.push(item);
-    map.set(key, group);
-  }
-  return [...map.values()].sort((a, b) => a.key.localeCompare(b.key));
+export function inWrittenOrder(items: Item[]): Item[] {
+  return [...items].sort((a, b) => a.createdAt - b.createdAt);
+}
+
+/** True when this line was written on a different day than the one before it. */
+export function startsNewDay(items: Item[], index: number): boolean {
+  if (index === 0) return false;
+  return dayKey(items[index].createdAt) !== dayKey(items[index - 1].createdAt);
 }
 
 export function inMonth(items: Item[], month: string): Item[] {

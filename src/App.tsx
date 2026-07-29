@@ -2,10 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Filter, Item } from './types';
 import { useItems } from './hooks/useItems';
 import { useTheme } from './hooks/useTheme';
-import { byMonth, dayGroups, filterItems, inMonth, monthSummaries } from './lib/group';
+import { byMonth, filterItems, inMonth, inWrittenOrder, monthSummaries, startsNewDay } from './lib/group';
 import type { MonthSummary } from './lib/group';
 import { currentMonthKey, monthLabel } from './lib/time';
 import { exportJSON, parseImport } from './lib/storage';
+import { describeDuration, hasTimer, withoutTimerTokens } from './lib/timer';
+import { ensurePermission, notifyTimerDone } from './lib/notify';
+import { TimerToast } from './components/TimerToast';
 import { InlineComposer } from './components/InlineComposer';
 import { MonthTabs } from './components/MonthTabs';
 import { MonthNote } from './components/MonthNote';
@@ -32,6 +35,9 @@ export default function App() {
     reply,
     removeReply,
     promoteReply,
+    toggleTimer,
+    resetTimer,
+    finishTimer,
     clearDone,
     replaceAll,
   } = useItems();
@@ -43,10 +49,13 @@ export default function App() {
   const [query, setQuery] = useState('');
   const [searching, setSearching] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const [rang, setRang] = useState<{ id: string; text: string; label: string | null }[]>([]);
 
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const searchRef = useRef<HTMLInputElement | null>(null);
   const justCaptured = useRef(false);
+  const announced = useRef(new Set<string>());
 
   // The current month always has a page, even before anything is written on it.
   const months = useMemo(() => {
@@ -73,10 +82,42 @@ export default function App() {
   const trimmedQuery = query.trim();
   const searchMode = searching && trimmedQuery.length > 0;
 
-  const days = useMemo(
-    () => dayGroups(filterItems(monthItems, filter, '')),
+  const pageItems = useMemo(
+    () => inWrittenOrder(filterItems(monthItems, filter, '')),
     [monthItems, filter],
   );
+
+  const running = useMemo(
+    () => items.some((item) => item.timers.some((timer) => timer.state === 'running')),
+    [items],
+  );
+
+  // One clock for the whole page, ticking only while something is counting.
+  useEffect(() => {
+    if (!running) return;
+    const id = window.setInterval(() => setNow(Date.now()), 500);
+    return () => window.clearInterval(id);
+  }, [running]);
+
+  // A timer reaching zero: mark it done, then say so. Timers that expired while
+  // the tab was closed are simply shown as finished — a notification for
+  // something that ended hours ago would be noise, not news.
+  useEffect(() => {
+    for (const item of items) {
+      for (const timer of item.timers) {
+        if (timer.state !== 'running' || timer.endsAt === null || timer.endsAt > now) continue;
+        finishTimer(item.id, timer.id);
+        if (announced.current.has(timer.id)) continue;
+        announced.current.add(timer.id);
+        const fresh = now - timer.endsAt < 60_000;
+        if (!fresh) continue;
+        const title = timer.label ?? `${describeDuration(timer.seconds)} timer`;
+        const body = withoutTimerTokens(item.text);
+        notifyTimerDone(`⏱ ${title}`, body);
+        setRang((prev) => [...prev, { id: timer.id, text: body, label: timer.label }]);
+      }
+    }
+  }, [items, now, finishTimer]);
 
   const results = useMemo(() => {
     if (!searchMode) return [];
@@ -99,6 +140,10 @@ export default function App() {
   function handleCapture(text: string) {
     const added = capture(text);
     if (!added) return;
+    // Writing a timer starts it, so this is the moment to ask about
+    // notifications — inside the keystroke that started it.
+    if (hasTimer(text)) void ensurePermission();
+    setNow(Date.now());
     setSearching(false);
     setQuery('');
     // A note written under a "Done" filter would vanish as you wrote it.
@@ -197,11 +242,13 @@ export default function App() {
     if (ok) replaceAll(parsed);
   }
 
-  const renderRow = (item: Item, showFullDate = false) => (
+  const renderRow = (item: Item, newDay = false) => (
     <NoteRow
       key={item.id}
       item={item}
+      now={now}
       expanded={expandedId === item.id}
+      startsNewDay={newDay}
       onToggleExpand={() => setExpandedId((current) => (current === item.id ? null : item.id))}
       onToggle={() => toggle(item.id)}
       onEdit={(text) => edit(item.id, text)}
@@ -209,8 +256,13 @@ export default function App() {
       onReply={(text) => reply(item.id, text)}
       onRemoveReply={(replyId) => removeReply(item.id, replyId)}
       onPromoteReply={(replyId) => promoteReply(item.id, replyId)}
+      onToggleTimer={(timerId) => {
+        void ensurePermission();
+        setNow(Date.now());
+        toggleTimer(item.id, timerId);
+      }}
+      onResetTimer={(timerId) => resetTimer(item.id, timerId)}
       parentText={item.parentId ? textById.get(item.parentId) : undefined}
-      showFullDate={showFullDate}
     />
   );
 
@@ -329,7 +381,9 @@ export default function App() {
                   <h2 className="hairline border-b px-4 py-3 font-display text-[19px] sm:px-6">
                     {monthLabel(group.key)}
                   </h2>
-                  <ul>{group.items.map((item) => renderRow(item, true))}</ul>
+                  <ul className="px-1 py-2 sm:px-2">
+                    {group.items.map((item) => renderRow(item))}
+                  </ul>
                 </section>
               ))
             )}
@@ -338,15 +392,14 @@ export default function App() {
           <MonthNote
             monthKey={activeMonth}
             summary={summary}
-            days={days}
-            renderItem={(item) => renderRow(item)}
+            items={pageItems}
+            renderItem={(item, i) => renderRow(item, startsNewDay(pageItems, i))}
             empty={
               <EmptyState
                 kind={isEmptyEverywhere ? 'fresh' : counts.all === 0 ? 'month' : 'filtered'}
                 onReset={() => setFilter('all')}
               />
             }
-            footerUnderToday={activeMonth === thisMonth}
             footer={
               activeMonth === thisMonth ? (
                 <InlineComposer ref={composerRef} onCapture={handleCapture} />
@@ -370,15 +423,23 @@ export default function App() {
           <p className="muted mt-6 text-center text-[11px]">
             <span className="hidden sm:inline">← → for months · N to write · / to search · </span>
             <span className="sm:hidden">Swipe left or right for other months · </span>
-            saved in this browser only
+            write <span className="font-medium">time(10m)</span> for a timer
           </p>
         )}
       </main>
 
       <div
-        className="pointer-events-none fixed inset-x-0 z-40 flex justify-center px-3"
+        className="pointer-events-none fixed inset-x-0 z-40 flex flex-col items-center gap-2 px-3"
         style={{ bottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}
       >
+        {rang.map((ring) => (
+          <TimerToast
+            key={ring.id}
+            text={ring.text}
+            label={ring.label}
+            onDismiss={() => setRang((prev) => prev.filter((r) => r.id !== ring.id))}
+          />
+        ))}
         {lastRemoved && (
           <UndoToast text={lastRemoved.item.text} onUndo={undoRemove} onDismiss={dismissUndo} />
         )}

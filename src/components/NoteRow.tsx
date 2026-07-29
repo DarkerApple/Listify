@@ -1,12 +1,14 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import type { Item } from '../types';
-import { fullStamp, stamp, timeLabel } from '../lib/time';
+import { dayLabel, fullStamp, isToday, timeLabel } from '../lib/time';
 import { CheckIcon, ThreadIcon, TrashIcon } from './icons';
+import { NoteText } from './NoteText';
 import { Thread } from './Thread';
 
 interface Props {
   item: Item;
   expanded: boolean;
+  now: number;
   onToggleExpand: () => void;
   onToggle: () => void;
   onEdit: (text: string) => void;
@@ -14,15 +16,17 @@ interface Props {
   onReply: (text: string) => void;
   onRemoveReply: (replyId: string) => void;
   onPromoteReply: (replyId: string) => void;
+  onToggleTimer: (timerId: string) => void;
+  onResetTimer: (timerId: string) => void;
   /** Shown when this item was split out of another item's thread. */
   parentText?: string;
-  /** Search results span months, so those rows carry a full date. */
-  showFullDate?: boolean;
+  /** A little air where the day changes — grouping without a heading. */
+  startsNewDay?: boolean;
 }
 
 /**
- * One line of the month's note. Rows are separated by a rule rather than boxed
- * as cards, so a month reads as a single continuous page.
+ * One line of the month's note. No rules between lines and no boxes: the page
+ * is one long note, and each line just happens to carry a checkbox and a time.
  *
  * Tapping the line opens its thread — the one primary action, and the only one
  * that works identically with a finger and a mouse. Edit and delete live inside
@@ -31,6 +35,7 @@ interface Props {
 export function NoteRow({
   item,
   expanded,
+  now,
   onToggleExpand,
   onToggle,
   onEdit,
@@ -38,8 +43,10 @@ export function NoteRow({
   onReply,
   onRemoveReply,
   onPromoteReply,
+  onToggleTimer,
+  onResetTimer,
   parentText,
-  showFullDate,
+  startsNewDay,
 }: Props) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(item.text);
@@ -73,8 +80,12 @@ export function NoteRow({
   const when = item.done && item.doneAt ? item.doneAt : item.createdAt;
 
   return (
-    <li className={`group animate-fade-in border-t transition-colors first:border-t-0 ${expanded ? 'rowtint' : ''}`} style={{ borderColor: 'rgb(var(--line))' }}>
-      <div className="flex items-start gap-3 px-3 py-2.5 sm:px-4">
+    <li
+      className={`group animate-fade-in rounded-lg transition-colors ${expanded ? 'rowtint' : ''} ${
+        startsNewDay ? 'mt-4' : ''
+      }`}
+    >
+      <div className="flex items-start gap-3 px-3 py-1.5 sm:px-4">
         <button
           type="button"
           role="checkbox"
@@ -123,21 +134,36 @@ export function NoteRow({
               className="hairline w-full resize-none rounded-lg border bg-transparent px-2 py-1 text-[15px] leading-relaxed focus:border-accent-400 focus:outline-none"
             />
           ) : (
-            <button
-              type="button"
+            // Not a <button>: a note can contain timer chips, which are
+            // buttons themselves, and buttons don't nest.
+            <div
+              role="button"
+              tabIndex={0}
               onClick={onToggleExpand}
               onDoubleClick={startEditing}
+              onKeyDown={(e) => {
+                if (e.target !== e.currentTarget) return;
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onToggleExpand();
+                }
+              }}
               aria-expanded={expanded}
-              className="block w-full text-left"
+              // Named explicitly: otherwise the name is built from the contents
+              // and would swallow the timer chips' own button labels.
+              aria-label={`Thread for “${item.text}”`}
+              className="block w-full cursor-pointer text-left"
             >
-              <span
-                className={`block whitespace-pre-wrap break-words text-[15px] leading-snug transition-colors ${
+              <NoteText
+                item={item}
+                now={now}
+                onToggleTimer={onToggleTimer}
+                onResetTimer={onResetTimer}
+                className={`block whitespace-pre-wrap break-words text-[15px] leading-relaxed transition-colors ${
                   item.done ? 'muted line-through decoration-1' : ''
                 }`}
-              >
-                {item.text}
-              </span>
-            </button>
+              />
+            </div>
           )}
 
           {(item.replies.length > 0 || expanded) && (
@@ -150,11 +176,11 @@ export function NoteRow({
           )}
         </div>
 
-        {/* The time sits in a fixed margin column so stamps line up down the
-            page, and the pointer-only delete never shifts it. */}
-        <div className="flex shrink-0 items-start gap-1 pt-px">
+        {/* The margin carries the time, and the date underneath it only when
+            it isn't today — which is why the page needs no day headings. */}
+        <div className="flex shrink-0 items-start gap-1 pt-0.5">
           <time
-            className={`muted text-right text-[11px] tabular-nums ${showFullDate ? '' : 'w-14'}`}
+            className="muted w-16 text-right text-[11px] leading-4 tabular-nums"
             dateTime={new Date(when).toISOString()}
             title={
               item.done && item.doneAt
@@ -162,7 +188,10 @@ export function NoteRow({
                 : fullStamp(item.createdAt)
             }
           >
-            {showFullDate ? stamp(when) : timeLabel(when)}
+            {timeLabel(when)}
+            {!isToday(when, now) && (
+              <span className="block text-[10px] opacity-70">{dayLabel(when, now)}</span>
+            )}
           </time>
           {/* Shortcut for pointer users; touch users get the same action below. */}
           <button

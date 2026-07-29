@@ -42,6 +42,10 @@ function startOfDay(ts: number): number {
   return d.getTime();
 }
 
+export function isToday(ts: number, now = Date.now()): boolean {
+  return startOfDay(ts) === startOfDay(now);
+}
+
 /** "2:14 PM" (locale-aware). */
 export function timeLabel(ts: number): string {
   return new Date(ts).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });

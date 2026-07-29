@@ -1,7 +1,24 @@
-import type { AppState, Item } from '../types';
+import type { AppState, Item, NoteTimer, TimerState } from '../types';
 
 const KEY = 'listify.v1';
 export const THEME_KEY = 'listify.theme';
+
+const TIMER_STATES: TimerState[] = ['running', 'paused', 'done'];
+
+function reviveTimer(raw: unknown): NoteTimer | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const o = raw as Record<string, unknown>;
+  if (typeof o.id !== 'string' || typeof o.seconds !== 'number' || o.seconds <= 0) return null;
+  const state = TIMER_STATES.includes(o.state as TimerState) ? (o.state as TimerState) : 'paused';
+  return {
+    id: o.id,
+    seconds: o.seconds,
+    label: typeof o.label === 'string' ? o.label : null,
+    endsAt: typeof o.endsAt === 'number' ? o.endsAt : null,
+    remainingMs: typeof o.remainingMs === 'number' ? o.remainingMs : o.seconds * 1000,
+    state,
+  };
+}
 
 /** Anything read from disk is untrusted — coerce it into a valid Item or drop it. */
 function reviveItem(raw: unknown): Item | null {
@@ -17,6 +34,12 @@ function reviveItem(raw: unknown): Item | null {
         return [{ id: x.id, text: x.text, createdAt: typeof x.createdAt === 'number' ? x.createdAt : createdAt }];
       })
     : [];
+  const timers = Array.isArray(o.timers)
+    ? o.timers.flatMap((t) => {
+        const timer = reviveTimer(t);
+        return timer ? [timer] : [];
+      })
+    : [];
   return {
     id: o.id,
     text: o.text,
@@ -25,6 +48,7 @@ function reviveItem(raw: unknown): Item | null {
     doneAt: typeof o.doneAt === 'number' ? o.doneAt : null,
     replies,
     parentId: typeof o.parentId === 'string' ? o.parentId : null,
+    timers,
   };
 }
 

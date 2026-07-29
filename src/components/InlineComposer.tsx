@@ -1,6 +1,7 @@
 import { forwardRef, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { countNotes } from '../lib/parse';
 import { timeLabel } from '../lib/time';
+import { describeDuration, findTimerTokens } from '../lib/timer';
 
 interface Props {
   onCapture: (text: string) => void;
@@ -91,6 +92,18 @@ export const InlineComposer = forwardRef<HTMLTextAreaElement, Props>(function In
   }
 
   const pending = countNotes(text);
+  const timers = findTimerTokens(text);
+
+  // The hint answers whatever you're currently doing: writing a timer, writing
+  // several notes at once, or just writing.
+  const hint =
+    timers.length > 0
+      ? `${timers.length === 1 ? 'Starts a' : `Starts ${timers.length} timers —`} ${timers
+          .map((t) => describeDuration(t.seconds))
+          .join(', ')} timer when you finish this note`
+      : pending > 1
+        ? `${pending} notes — a blank line ends each one`
+        : 'Enter for a new line · Enter twice starts the next note · time(10m) starts a timer';
 
   return (
     <div className="pb-2">
@@ -135,10 +148,12 @@ export const InlineComposer = forwardRef<HTMLTextAreaElement, Props>(function In
       </div>
 
       {(focused || text) && (
-        <p className="muted animate-fade-in px-3 pl-[52px] text-[11px] sm:px-4 sm:pl-[56px]">
-          {pending > 1
-            ? `${pending} notes — a blank line ends each one`
-            : 'Enter for a new line · Enter twice starts the next note'}
+        <p
+          className={`animate-fade-in px-3 pl-[52px] text-[11px] sm:px-4 sm:pl-[56px] ${
+            timers.length > 0 ? 'text-accent-700 dark:text-accent-300' : 'muted'
+          }`}
+        >
+          {hint}
         </p>
       )}
 
