@@ -1,9 +1,9 @@
 {
   "name": "listify",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
-  "description": "Listify — a minimal, private, offline-first daily journal (PWA).",
+  "description": "Listify — catch a thought, get a checklist. Notes become tasks, tasks become threads, everything sorted by month.",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
@@ -11,13 +11,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@use-gesture/react": "^10.3.1",
-    "dexie": "^4.0.10",
-    "framer-motion": "^11.18.2",
-    "lucide-react": "^0.468.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "zustand": "^4.5.5"
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
     "@types/react": "^18.3.12",
@@ -27,7 +22,6 @@
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.6.3",
-    "vite": "^5.4.11",
-    "vite-plugin-pwa": "^0.21.2"
+    "vite": "^5.4.11"
   }
 }

@@ -1,98 +1,127 @@
-import { useEffect, useReducer } from 'react';
-import { useJournalStore } from './store/useJournalStore';
-import { useSecurity } from './store/useSecurity';
-import { useRoute } from './router/useRoute';
-import { todayISO } from './lib/date';
-import { DayScreen } from './screens/DayScreen';
-import { MonthScreen } from './screens/MonthScreen';
-import { YearScreen } from './screens/YearScreen';
-import { SearchScreen } from './screens/SearchScreen';
-import { HighlightsScreen } from './screens/HighlightsScreen';
-import { TagScreen } from './screens/TagScreen';
-import { SettingsScreen } from './screens/SettingsScreen';
-import { LockScreen } from './screens/LockScreen';
-import { TabBar } from './components/TabBar';
-
-/** ms until the next local midnight. */
-function untilMidnight(): number {
-  const now = new Date();
-  const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 1);
-  return next.getTime() - now.getTime();
-}
+import { useCallback, useMemo, useState } from 'react';
+import { useTheme } from './hooks/useTheme';
+import { useRoute } from './hooks/useRoute';
+import { go } from './lib/route';
+import { mainStorage } from './lib/storage';
+import { vaultExists } from './lib/vault';
+import type { OpenVault } from './lib/vault';
+import { Home } from './components/Home';
+import { Guide } from './components/Guide';
+import { Notebook } from './components/Notebook';
+import { VaultGate } from './components/VaultGate';
+import { MoonIcon, SunIcon } from './components/icons';
+import { currentMonthKey } from './lib/time';
 
 export default function App() {
-  const init = useJournalStore((s) => s.init);
-  const sweep = useJournalStore((s) => s.sweepAutoSeal);
-  const loadDate = useJournalStore((s) => s.loadDate);
-  const secInit = useSecurity((s) => s.init);
-  const secReady = useSecurity((s) => s.ready);
-  const appLocked = useSecurity((s) => s.appLocked);
-  const lockVault = useSecurity((s) => s.lockVault);
   const route = useRoute();
-  const [, forceTick] = useReducer((n: number) => n + 1, 0);
+  const { theme, toggle: toggleTheme } = useTheme();
 
-  useEffect(() => {
-    void secInit();
-    void init();
-  }, [secInit, init]);
+  // The vault's key lives here and nowhere else: navigating around keeps it
+  // open, reloading the page does not.
+  const [vault, setVault] = useState<OpenVault | null>(null);
+  const [hasVault, setHasVault] = useState(vaultExists);
 
-  // Wipe the in-memory vault key when the app is backgrounded (spec §6).
-  useEffect(() => {
-    function onHide() {
-      if (document.visibilityState === 'hidden') lockVault();
+  const themeToggle = (
+    <button
+      type="button"
+      onClick={toggleTheme}
+      aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+      className="muted flex h-9 w-9 items-center justify-center rounded-xl transition hover:text-[rgb(var(--text))]"
+    >
+      {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+    </button>
+  );
+
+  const goHome = useCallback(() => go({ name: 'home' }), []);
+
+  // Flicking through months shouldn't fill the back stack with every month you
+  // passed; the URL still points at where you are.
+  const trackMonth = useCallback((month: string) => go({ name: 'month', month }, true), []);
+  const trackSecretMonth = useCallback((month: string) => go({ name: 'secret', month }, true), []);
+
+  if (route.name === 'guide') {
+    return (
+      <Guide
+        onBack={goHome}
+        onStart={() => go({ name: 'month', month: currentMonthKey() })}
+        themeToggle={themeToggle}
+      />
+    );
+  }
+
+  if (route.name === 'secret') {
+    if (!vault) {
+      return (
+        <VaultGate
+          exists={hasVault}
+          onOpen={(opened) => {
+            setVault(opened);
+            setHasVault(true);
+          }}
+          onBack={goHome}
+          onReset={() => setHasVault(false)}
+          themeToggle={themeToggle}
+        />
+      );
     }
-    document.addEventListener('visibilitychange', onHide);
-    window.addEventListener('pagehide', lockVault);
-    return () => {
-      document.removeEventListener('visibilitychange', onHide);
-      window.removeEventListener('pagehide', lockVault);
-    };
-  }, [lockVault]);
+    return (
+      <Notebook
+        // Remounting on lock/unlock is deliberate: no notes from a closed
+        // notebook can linger in component state.
+        key="vault"
+        storage={vault.storage}
+        initialMonth={route.month}
+        onMonthChange={trackSecretMonth}
+        onHome={goHome}
+        secret
+        onLock={() => {
+          setVault(null);
+          goHome();
+        }}
+        themeToggle={themeToggle}
+      />
+    );
+  }
 
-  // At local midnight: seal yesterday, roll the "today" view over.
-  useEffect(() => {
-    let timer: number;
-    const arm = () => {
-      timer = window.setTimeout(async () => {
-        await sweep();
-        await loadDate(todayISO());
-        forceTick();
-        arm();
-      }, untilMidnight());
-    };
-    arm();
-    return () => window.clearTimeout(timer);
-  }, [sweep, loadDate]);
+  if (route.name === 'month') {
+    return (
+      <Notebook
+        key="main"
+        storage={mainStorage}
+        initialMonth={route.month}
+        onMonthChange={trackMonth}
+        onHome={goHome}
+        themeToggle={themeToggle}
+      />
+    );
+  }
 
-  // Hold rendering until we know the lock state, then gate behind the passcode.
-  if (!secReady) return <div className="paper-grid h-full" />;
-  if (appLocked) return <LockScreen />;
+  return <HomeScreen vaultOpen={vault !== null} hasVault={hasVault} themeToggle={themeToggle} />;
+}
 
-  const screen = (() => {
-    switch (route.name) {
-      case 'today':
-        return <DayScreen date={todayISO()} />;
-      case 'day':
-        return <DayScreen date={route.date} />;
-      case 'settings':
-        return <SettingsScreen />;
-      case 'month':
-        return <MonthScreen year={route.year} month={route.month} />;
-      case 'year':
-        return <YearScreen year={route.year} />;
-      case 'search':
-        return <SearchScreen />;
-      case 'highlights':
-        return <HighlightsScreen />;
-      case 'tag':
-        return <TagScreen tag={route.tag} />;
-    }
-  })();
-
+/**
+ * Home reads the notebook straight from storage rather than mounting the data
+ * hook: it's a contents page, and it's rebuilt every time you come back to it.
+ */
+function HomeScreen({
+  vaultOpen,
+  hasVault,
+  themeToggle,
+}: {
+  vaultOpen: boolean;
+  hasVault: boolean;
+  themeToggle: React.ReactNode;
+}) {
+  const items = useMemo(() => mainStorage.load(), []);
   return (
-    <div className="flex h-full flex-col">
-      <main className="min-h-0 flex-1">{screen}</main>
-      <TabBar />
-    </div>
+    <Home
+      items={items}
+      vaultExists={hasVault}
+      vaultOpen={vaultOpen}
+      onOpenMonth={(month) => go({ name: 'month', month })}
+      onOpenGuide={() => go({ name: 'guide' })}
+      onOpenSecret={() => go({ name: 'secret' })}
+      themeToggle={themeToggle}
+    />
   );
 }
