@@ -1,11 +1,20 @@
 name: Deploy to GitHub Pages
 
-# Builds the Vite app and publishes dist/ to GitHub Pages.
+# Builds the Vite app on every branch, and publishes dist/ to Pages from the
+# repo's default branch.
+#
+# Why only the default branch: the `github-pages` environment carries a
+# deployment branch policy that accepts the default branch alone. A deploy from
+# any other branch is rejected before the job is even given a runner — it fails
+# in about a second with no logs at all, which reads like a broken workflow but
+# is really a permissions rule. Skipping the job there keeps feature branches
+# green and honest: the build still proves the app compiles.
+#
 # One-time setup: repo Settings → Pages → Source = "GitHub Actions".
 
 on:
   push:
-    branches: [main, master, claude/notes-checklist-app-08cdb8]
+    branches: ['**']
   workflow_dispatch:
 
 permissions:
@@ -39,6 +48,8 @@ jobs:
 
   deploy:
     needs: build
+    # Nothing else may deploy, so don't pretend otherwise by trying.
+    if: github.ref_name == github.event.repository.default_branch
     runs-on: ubuntu-latest
     environment:
       name: github-pages

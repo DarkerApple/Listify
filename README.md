@@ -141,9 +141,15 @@ npm run preview  # serve the production build
 
 ## Deploying
 
-Pushing to the default branch builds and publishes to GitHub Pages via
-`.github/workflows/deploy.yml`. One-time setup: **Settings → Pages → Source = GitHub Actions**. The
+`.github/workflows/deploy.yml` builds the app on every branch and publishes to GitHub Pages from the
+repo's **default branch**. One-time setup: **Settings → Pages → Source = GitHub Actions**. The
 workflow passes `BASE_PATH=/<repo>/` so assets resolve on a project site.
+
+The deploy job is skipped on other branches deliberately. The `github-pages` environment only
+accepts deployments from the default branch, and a deploy from anywhere else is rejected before the
+job is given a runner — it fails in about a second with no logs, which looks like a broken workflow
+but is a branch policy. So: to publish a branch, make it the default (Settings → Branches) or merge
+it into the default one.
 
 ## How it's built
 
