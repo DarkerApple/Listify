@@ -3,6 +3,16 @@ import type { AppState, Item, NoteTimer, TimerState } from '../types';
 const KEY = 'listify.v1';
 export const THEME_KEY = 'listify.theme';
 
+/**
+ * A notebook's backing store. The everyday notes use localStorage directly;
+ * the secret notebook swaps in an encrypted implementation with the same shape,
+ * which is why every screen below works for both without knowing the difference.
+ */
+export interface NotebookStorage {
+  load: () => Item[];
+  save: (items: Item[]) => void;
+}
+
 const TIMER_STATES: TimerState[] = ['running', 'paused', 'done'];
 
 function reviveTimer(raw: unknown): NoteTimer | null {
@@ -76,6 +86,8 @@ export function saveItems(items: Item[]): void {
     // Quota or private mode: keep running in memory rather than crashing.
   }
 }
+
+export const mainStorage: NotebookStorage = { load: loadItems, save: saveItems };
 
 /** Serialized backup the user can download. */
 export function exportJSON(items: Item[]): string {

@@ -34,8 +34,18 @@ where you typed it, counting down and chiming when it's up.
 
 ## Navigating
 
-Month tabs sit under the header, oldest on the left, each with a badge for how many items are still
-open. The active tab always scrolls itself into view.
+Listify opens on a contents page: every year you've written in, as a grid of months, with a note
+count and a progress bar on each. Months you haven't written in aren't pages, so they sit greyed out
+and don't invite a click. Above the years is the month you're in, and below them are the guide and
+the secret notebook.
+
+Inside a notebook, month tabs sit under the header, oldest on the left, each badged with how many
+items are still open. The active tab always scrolls itself into view, and **Years** in the header
+goes back to the contents page.
+
+Routes live in the URL hash — `#/`, `#/m/2026-07`, `#/guide`, `#/secret` — so browser back and
+forward retrace your steps and a reload lands where you were. Flicking between months replaces the
+entry rather than stacking one per month.
 
 | Move | How |
 | --- | --- |
@@ -89,6 +99,30 @@ hover delete on the row and double-click to edit.
 Deleting is undoable for 8 seconds. The ⋮ menu clears completed items and exports or imports a JSON
 backup — worth doing occasionally, since clearing site data clears notes.
 
+## Secret notes
+
+A second notebook behind a password. Inside, it is the everyday notebook — same month pages, same
+writing line, same timers, threads and search — over different storage.
+
+The password is the key, not a curtain. Notes are encrypted with **AES-GCM** under a key derived by
+**PBKDF2** (SHA-256, 310,000 iterations, random 16-byte salt), and only ciphertext is written to
+disk: `{ salt, iv, data }` and nothing else. A fresh nonce is generated on every save.
+
+Consequences worth stating plainly:
+
+- Nothing derived from the password is stored, so **there is no reset**. A forgotten password means
+  those notes are gone; the lock screen can delete them so you can start over, and that's all.
+- A wrong password fails authentication rather than returning garbage, so "wrong password" is a real
+  answer rather than a guess.
+- The key is held in memory only. Reload the page, and it's locked again — as is the **Lock**
+  button in the header.
+- The ⋮ menu offers no export inside it, since that would write the notes to disk in the clear.
+- Web Crypto needs a secure context, so this works over https or on localhost. The gate says so
+  rather than pretending to encrypt.
+
+What it is not: protection against someone who already controls your browser or machine. It keeps
+secret notes out of a shoulder-surf, a shared laptop, or a casual look through localStorage.
+
 ## Mobile
 
 Built for a phone first: 44px touch targets around every control, 16px inputs so iOS never zooms on
@@ -118,17 +152,24 @@ dependencies in total.
 
 ```
 src/
-  App.tsx              layout, month switching, swipe, keyboard shortcuts
-  types.ts             Item + Reply
-  hooks/useItems.ts    every mutation, persisted to localStorage on change
+  App.tsx              the shell: routes, theme, and who holds the vault key
+  types.ts             Item + Reply + NoteTimer
+  hooks/useNotebook.ts every mutation, written back through a storage adapter
+  hooks/useRoute.ts    the current hash route
   hooks/useTheme.ts    light/dark, applied pre-paint in index.html
+  lib/route.ts         four routes, parsed and built
+  lib/vault.ts         PBKDF2 + AES-GCM behind the same storage interface
   lib/parse.ts         what you wrote -> notes (blank line splits, lists split)
   lib/group.ts         month summaries, page order, filtering, search
   lib/time.ts          month/day keys and the short margin stamps
   lib/timer.ts         time(...) tokens, durations, countdown formatting
   lib/notify.ts        permission, system notification, chime
-  lib/storage.ts       load/save/export/import, with validation on read
+  lib/storage.ts       the storage interface, plus export/import and validation
   components/
+    Home.tsx           the contents page: years, months, guide, secret notes
+    Guide.tsx          how it works, in four steps
+    Notebook.tsx       a whole notebook — used for both the everyday and secret one
+    VaultGate.tsx      set a password, or enter it
     MonthTabs.tsx      the navigation
     MonthNote.tsx      the month sheet: title, progress, the page itself
     NoteRow.tsx        one line + its expanded panel
@@ -138,6 +179,10 @@ src/
     Thread.tsx         elaboration, and promoting a message to an item
     FilterTabs, SearchBar, EmptyState, UndoToast, TimerToast, Menu, icons
 ```
+
+A notebook is a screen over a `NotebookStorage` — `{ load, save }`. The everyday notes use
+localStorage directly and the secret ones encrypt on the way through, which is why one component
+serves both and neither knows the difference.
 
 Surfaces are CSS variables (`--paper`, `--card`, `--line`, `--row`), so light and dark are one
 definition rather than two sets of classes. Stored data is validated field-by-field when read, so a

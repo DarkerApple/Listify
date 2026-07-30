@@ -4,12 +4,14 @@ import { MenuIcon } from './icons';
 interface Props {
   doneCount: number;
   onClearDone: () => void;
+  /** False in the secret notebook, where a backup would be plaintext on disk. */
+  allowBackup?: boolean;
   onExport: () => void;
   onImport: (file: File) => void;
 }
 
 /** Housekeeping tucked out of the way: clear done, export, import. */
-export function Menu({ doneCount, onClearDone, onExport, onImport }: Props) {
+export function Menu({ doneCount, onClearDone, allowBackup = true, onExport, onImport }: Props) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
@@ -63,27 +65,33 @@ export function Menu({ doneCount, onClearDone, onExport, onImport }: Props) {
           >
             Clear {doneCount} done {doneCount === 1 ? 'item' : 'items'}
           </button>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              onExport();
-              setOpen(false);
-            }}
-            className={itemClass}
-          >
-            Export a backup (.json)
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => fileRef.current?.click()}
-            className={itemClass}
-          >
-            Import a backup…
-          </button>
+          {allowBackup && (
+            <>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  onExport();
+                  setOpen(false);
+                }}
+                className={itemClass}
+              >
+                Export a backup (.json)
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => fileRef.current?.click()}
+                className={itemClass}
+              >
+                Import a backup…
+              </button>
+            </>
+          )}
           <p className="muted px-3 py-2 text-[11px] leading-relaxed">
-            Everything stays in this browser. Nothing is uploaded anywhere.
+            {allowBackup
+              ? 'Everything stays in this browser. Nothing is uploaded anywhere.'
+              : 'These notes are encrypted on disk, so there’s no plain-text backup to export.'}
           </p>
           <input
             ref={fileRef}

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Item, NoteTimer } from '../types';
-import { loadItems, saveItems } from '../lib/storage';
+import type { NotebookStorage } from '../lib/storage';
 import { newId } from '../lib/id';
 import { splitIntoNotes } from '../lib/parse';
 import { findTimerTokens, remainingMs } from '../lib/timer';
@@ -34,17 +34,18 @@ function timersFor(text: string, previous: NoteTimer[] = [], now = Date.now()): 
 }
 
 /**
- * The whole data layer. Items live in React state and are mirrored to
- * localStorage on every change — no server, no account, no sync.
+ * The whole data layer for one notebook. Items live in React state and are
+ * written back through the storage it was given on every change — plain
+ * localStorage for the everyday notes, encrypted for the secret ones.
  */
-export function useItems() {
-  const [items, setItems] = useState<Item[]>(loadItems);
+export function useNotebook(storage: NotebookStorage) {
+  const [items, setItems] = useState<Item[]>(storage.load);
   const [lastRemoved, setLastRemoved] = useState<RemovedItem | null>(null);
   const undoTimer = useRef<number | null>(null);
 
   useEffect(() => {
-    saveItems(items);
-  }, [items]);
+    storage.save(items);
+  }, [items, storage]);
 
   useEffect(() => () => {
     if (undoTimer.current) window.clearTimeout(undoTimer.current);

@@ -91,6 +91,41 @@ export const MenuIcon = (p: Props) => (
   </Svg>
 );
 
+export const HomeIcon = (p: Props) => (
+  <Svg {...p}>
+    <path d="M4 10.5L12 4l8 6.5" />
+    <path d="M6 9.8V20h12V9.8" />
+  </Svg>
+);
+
+export const LockIcon = (p: Props) => (
+  <Svg {...p}>
+    <rect x="4.5" y="10" width="15" height="10.5" rx="2.5" />
+    <path d="M8 10V7.5a4 4 0 018 0V10" />
+  </Svg>
+);
+
+export const UnlockIcon = (p: Props) => (
+  <Svg {...p}>
+    <rect x="4.5" y="10" width="15" height="10.5" rx="2.5" />
+    <path d="M8 10V7.5a4 4 0 017.5-2" />
+  </Svg>
+);
+
+export const BookIcon = (p: Props) => (
+  <Svg {...p}>
+    <path d="M4 5.5A2 2 0 016 3.5h13v15H6a2 2 0 00-2 2z" />
+    <path d="M19 18.5v2H6" />
+  </Svg>
+);
+
+export const SparkIcon = (p: Props) => (
+  <Svg {...p}>
+    <path d="M12 3.5l1.9 5.1 5.1 1.9-5.1 1.9L12 17.5l-1.9-5.1L5 10.5l5.1-1.9z" />
+    <path d="M18.5 16.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z" />
+  </Svg>
+);
+
 export const ChevronLeftIcon = (p: Props) => (
   <Svg {...p}>
     <path d="M15 5l-7 7 7 7" />
